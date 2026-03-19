@@ -4,13 +4,13 @@
  * @param path - The path string to parse. Can be in the format `/docs/section/...` or `/section/...`.
  *               If undefined or empty, defaults to 'other'.
  * @returns The section identifier. Returns 'guide' if the path matches the guide section,
- *          'bamboo-base-go' if the path matches bamboo-base-go section,
+ *          'beacon-sso' if the path matches beacon-sso section,
  *          otherwise returns 'other' as a fallback.
  *
  * @example
  * getSection('/docs/guide/intro') // returns 'guide'
  * getSection('/guide/intro') // returns 'guide'
- * getSection('/docs/bamboo-base-go/core') // returns 'bamboo-base-go'
+ * getSection('/docs/beacon-sso/go-sdk/core') // returns 'beacon-sso'
  * getSection('/docs/') // returns 'other'
  * getSection(undefined) // returns 'other'
  */
@@ -26,8 +26,8 @@ export function getSection(path: string | undefined) {
   if (!section) return 'other';
   return (
     {
-      guide: 'guide',
-      'bamboo-base-go': 'bamboo-base-go',
+      'guide': 'guide',
+      'beacon-sso': 'beacon-sso',
     }[section] ?? 'other'
   );
 }

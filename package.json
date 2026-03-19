@@ -1,5 +1,5 @@
 {
-  "name": "bamboo-base-go",
+  "name": "phalanx-document",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -24,7 +24,7 @@
     "fumadocs-mdx": "14.2.6",
     "fumadocs-ui": "16.4.11",
     "lucide-react": "^0.563.0",
-    "mermaid": "^11.12.2",
+    "mermaid": "^11.13.0",
     "next": "16.1.4",
     "next-themes": "^0.4.6",
     "react": "^19.2.3",

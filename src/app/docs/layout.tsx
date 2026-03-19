@@ -9,7 +9,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <DocsLayout
       {...baseOptions()}
       tree={source.getPageTree()}
-      githubUrl='https://github.com/bamboo-services/bamboo-base-go'
+      githubUrl='https://github.com/xiaolfeng/phalanx-document'
       sidebar={{
         enabled: true,
         collapsible: true,

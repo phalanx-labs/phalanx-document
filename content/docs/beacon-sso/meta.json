@@ -1,7 +1,8 @@
 {
   "title": "Beacon SSO SDK",
   "icon": "Key",
-  "description": "面向 Gin 框架的轻量级 OAuth2/SSO SDK",
+  "description": "多语言 OAuth2/SSO SDK，提供统一登录、用户管理与商户服务能力",
+  "root": true,
   "pages": [
     "index",
     "---Go SDK---",

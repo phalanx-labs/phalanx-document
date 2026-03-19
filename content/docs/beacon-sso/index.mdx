@@ -1,20 +1,29 @@
 ---
 title: Beacon SSO SDK
-description: 面向 Gin 框架的轻量级 OAuth2/SSO SDK
+description: 多语言 OAuth2/SSO SDK，提供统一登录、用户管理与商户服务能力
 icon: Key
 ---
 
 # Beacon SSO SDK
 
-Beacon SSO SDK 提供统一登录、用户管理和商户服务能力，支持多种语言技术栈。
+Beacon SSO SDK 为现代后端服务提供统一认证能力，支持多种语言技术栈，帮助快速集成 OAuth2 授权码流程、用户管理和商户服务。
 
-## 多语言支持
+## 选择你的技术栈
 
-<CardGroup cols={2}>
+<Cards cols={2}>
   <Card title="Go SDK" href="./go-sdk">
     面向 Gin 框架的轻量级 OAuth2/SSO SDK，提供 OAuth2 授权码流程、gRPC 服务客户端和认证中间件。
   </Card>
   <Card title="Java SDK" href="./java-sdk">
     基于 Spring Boot 3 的 OAuth2/SSO SDK，提供自动配置、Filter 认证、AOP 切面和可选 gRPC 服务。
   </Card>
-</CardGroup>
+</Cards>
+
+## 核心能力
+
+| 能力 | 说明 |
+|------|------|
+| **OAuth2 授权码流程** | 完整的 State + PKCE 防护机制 |
+| **gRPC 服务客户端** | 认证、用户、商户等核心服务 |
+| **认证中间件/过滤器** | 开箱即用的 Token 验证 |
+| **缓存策略** | 灵活的缓存方案（Redis / Caffeine） |

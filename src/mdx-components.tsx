@@ -7,11 +7,6 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
   return {
     ...defaultMdxComponents,
     Mermaid,
-    pre: ({ ref: _ref, ...props }) => (
-      <CodeBlock keepBackground {...props}>
-        <Pre>{props.children}</Pre>
-      </CodeBlock>
-    ),
     ...components,
   };
 }

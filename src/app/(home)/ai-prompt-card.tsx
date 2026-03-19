@@ -4,7 +4,7 @@ import { Bot, Check, Copy, Terminal } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
-const AGENT_PROMPT = `请按以下步骤获取竹简文档并回答我的问题：
+const AGENT_PROMPT = `请按以下步骤获取锋翎文档并回答我的问题：
 
 1. 获取文档索引：https://doc.x-lf.com/llms.txt
 2. 从索引中找到与我的问题相关的页面路径

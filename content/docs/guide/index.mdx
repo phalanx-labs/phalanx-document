@@ -1,27 +1,27 @@
 ---
 title: 入门指南
-description: 快速了解竹简文档的使用方法
+description: 快速了解锋翎文档的使用方法
 icon: BookOpen
 ---
 
 # 入门指南
 
-欢迎使用竹简文档！本指南将帮助你快速了解如何使用本站获取所需信息。
+欢迎使用锋翎文档！本指南将帮助你快速了解如何使用本站获取所需信息。
 
-## 关于竹简库
+## 关于 Phalanx
 
-竹简库是一套跨语言的后端服务组件库，旨在提供统一风格的 API 设计和开发体验。目前支持：
+Phalanx 是一套跨语言的后端服务组件库，旨在提供统一风格的 API 设计和开发体验。目前支持：
 
 <Cards>
   <Card
-    title="筱工具 (Golang)"
-    description="基于 Gin 框架的 Go 语言组件库"
-    href="../bamboo-base-go"
+    title="Beacon SSO (Golang)"
+    description="面向 Gin 框架的轻量 SSO SDK"
+    href="../beacon-sso/go-sdk"
   />
   <Card
-    title="筱工具 (Java)"
-    description="基于 Spring Boot 3 的 Java 语言组件库"
-    href="../bamboo-base-java"
+    title="Beacon SSO (Java)"
+    description="基于 Spring Boot 的 SSO SDK"
+    href="../beacon-sso/java-sdk"
   />
 </Cards>
 
@@ -31,26 +31,24 @@ icon: BookOpen
 
 根据你的技术栈选择对应的文档：
 
-- **Go 开发者**：前往 [Go 快速开始](../bamboo-base-go/quick-start) 了解如何在 Gin 项目中集成
-- **Java 开发者**：前往 [Java 快速开始](../bamboo-base-java/quick-start) 了解如何在 Spring Boot 项目中集成
+- **Go 开发者**：前往 [Go 快速开始](../beacon-sso/go-sdk/quick-start) 了解如何在 Gin 项目中集成
+- **Java 开发者**：前往 [Java 快速开始](../beacon-sso/java-sdk/quick-start) 了解如何在 Spring Boot 项目中集成
 
-### 核心概念
+### 核心功能
 
-竹简库在两种语言中提供了相似的核心功能：
+Beacon SSO 在两种语言中提供了相似的核心功能：
 
 | 功能 | 说明 |
 |------|------|
-| **统一响应** | `BaseResponse` 标准化 API 响应格式 |
-| **错误码** | 统一的错误码体系，便于前后端协作 |
-| **雪花算法** | 分布式 ID 生成器 |
-| **上下文管理** | 请求上下文与链路追踪 |
-| **异常处理** | 分层异常处理器，优雅处理各类异常 |
+| **OAuth2 授权** | 完整的 OAuth2 授权码流程支持 |
+| **gRPC 客户端** | 高效的服务间通信 |
+| **缓存** | 灵活的缓存策略，降低鉴权开销 |
 
 ## 反馈与贡献
 
 如果你发现文档有误或有改进建议：
 
-- **GitHub**：[bamboo-services](https://github.com/bamboo-services) 提交 Issue 或 PR
+- **GitHub**：[xiaolfeng](https://github.com/xiaolfeng) 提交 Issue 或 PR
 - **网站**：[筱锋的博客](https://www.x-lf.com) 留言
 
 ---
@@ -59,12 +57,12 @@ icon: BookOpen
   <Card
     title="Go 快速开始"
     description="5 分钟集成到你的 Gin 项目"
-    href="../bamboo-base-go/quick-start"
+    href="../beacon-sso/go-sdk/quick-start"
   />
   <Card
     title="Java 快速开始"
     description="5 分钟集成到你的 Spring Boot 项目"
-    href="../bamboo-base-java/quick-start"
+    href="../beacon-sso/java-sdk/quick-start"
   />
   <Card
     title="AI 集成"

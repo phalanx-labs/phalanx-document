@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**竹简文档 (Bamboo Document)** — Bamboo 服务组件库的文档站点，基于 Next.js 16 + Fumadocs 构建。文档内容以 MDX 格式存储，面向多个语言技术栈（Golang/Java/TypeScript）。
+**锋翎文档** — Phalanx 项目文档站点，基于 Next.js 16 + Fumadocs 构建。文档内容以 MDX 格式存储，面向多个语言技术栈（Golang/Java）。
 
 ## Commands
 
@@ -64,4 +64,4 @@ src/lib/source.ts   ← loader() 统一内容源入口，导出 source / getPage
 
 ### Navigation
 
-`src/lib/navigation.ts` 中的 `getSection()` 从 URL 提取 section 标识（guide/bamboo-base-go/other），用于 sidebar tabs 颜色等逻辑。
+`src/lib/navigation.ts` 中的 `getSection()` 从 URL 提取 section 标识（guide/beacon-sso/other），用于 sidebar tabs 颜色等逻辑。

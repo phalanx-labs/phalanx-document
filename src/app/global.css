@@ -15,7 +15,7 @@
     /* Section 主色定义 (oklch: 明度 饱和度 色相) */
     --custom-guide-selected-color: oklch(0.65 0.25 342);
     --custom-other-selected-color: oklch(0.55 0.18 142);
-    --custom-bamboo-base-go-selected-color: oklch(0.65 0.18 220);
+    --custom-beacon-sso-selected-color: oklch(0.65 0.18 220);
 
     --section-color: var(--color-fd-foreground);
     --radius: 0.625rem;
@@ -24,7 +24,7 @@
 .dark {
     --custom-guide-selected-color: oklch(0.75 0.20 342);
     --custom-other-selected-color: oklch(0.70 0.15 165);
-    --custom-bamboo-base-go-selected-color: oklch(0.75 0.15 220);
+    --custom-beacon-sso-selected-color: oklch(0.75 0.15 220);
 }
 
 /*
