@@ -1,14 +1,14 @@
 'use client';
 
-import { Bot, Check, Copy, Terminal } from 'lucide-react';
+import { Bot, Check, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
 const AGENT_PROMPT = `请按以下步骤获取锋翎文档并回答我的问题：
 
-1. 获取文档索引：https://doc.x-lf.com/llms.txt
+1. 获取文档索引：https://beacon.api-fy.cn/llms.txt
 2. 从索引中找到与我的问题相关的页面路径
-3. 获取该页面内容：https://doc.x-lf.com/llms.mdx/<找到的路径>
+3. 获取该页面内容：https://beacon.api-fy.cn/llms.mdx/<找到的路径>
 4. 基于文档内容回答：[你的问题]`;
 
 export function AIPromptCard() {
@@ -47,18 +47,12 @@ export function AIPromptCard() {
             </div>
             <div className="flex flex-wrap gap-3">
                 <Link
-                    href="/docs/guide/claude-code"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
-                >
-                    <Terminal className="size-4" />
-                    Claude Code 集成
-                </Link>
-                <Link
-                    href="/docs/guide/ai-integration"
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium"
-                >
-                    查看更多集成方式
-                </Link>
+                href="/docs/guide/ai-integration"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+            >
+                <Bot className="size-4" />
+                查看更多集成方式
+            </Link>
             </div>
         </div>
     );
