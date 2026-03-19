@@ -1,0 +1,282 @@
+---
+title: Merchant 服务
+description: 商户标签与公告服务
+icon: Building
+---
+
+# Merchant 服务
+
+Merchant 服务提供商户标签和公告管理功能。
+
+<Callout type="warn">
+Merchant 服务需要在 metadata 中提供 App 凭证（`app-access-id` 和 `app-secret-key`），由 `GrpcUtil` 自动注入。
+</Callout>
+
+## 接口概览
+
+| 方法 | 说明 |
+|------|------|
+| `GetMerchantTags` | 获取商户标签列表 |
+| `GetUserTags` | 获取用户标签列表 |
+| `CheckUserHasTag` | 检查用户是否有指定标签 |
+| `GetRecentAnnouncements` | 获取最近公告列表 |
+| `GetAnnouncement` | 获取单个公告详情 |
+
+## 标签系统
+
+### GetMerchantTags
+
+获取当前应用所属商户的所有标签列表。
+
+#### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `enabledOnly` | `bool` | No | 仅返回已启用的标签（默认 `true`） |
+
+#### 响应
+
+返回 `MerchantTagResult` 列表：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `code` | `string` | 标签代码 |
+| `name` | `string` | 标签名称 |
+| `description` | `string` | 标签描述 |
+| `enabled` | `bool` | 是否启用 |
+
+#### 使用示例
+
+```java
+var tags = ssoApi.merchant().getMerchantTags(
+    GetMerchantTagsRequest.newBuilder()
+        .setEnabledOnly(true)
+        .build()
+);
+
+if (tags != null) {
+    for (var tag : tags.getTagsList()) {
+        System.out.printf("标签: %s (%s)%n", tag.getName(), tag.getCode());
+    }
+}
+```
+
+### GetUserTags
+
+获取指定用户在当前商户的所有标签。
+
+#### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `userId` | `string` | Yes | 目标用户 ID |
+| `enabledOnly` | `bool` | No | 仅返回已启用的标签（默认 `true`） |
+
+#### 响应
+
+返回 `MerchantTagResult` 列表，字段同 `GetMerchantTags`。
+
+#### 使用示例
+
+```java
+var tags = ssoApi.merchant().getUserTags(
+    GetUserTagsRequest.newBuilder()
+        .setUserId("user-123")
+        .setEnabledOnly(true)
+        .build()
+);
+
+if (tags != null) {
+    for (var tag : tags.getTagsList()) {
+        System.out.printf("用户标签: %s%n", tag.getName());
+    }
+}
+```
+
+### CheckUserHasTag
+
+通过标签代码快速检查用户是否拥有该标签。
+
+#### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `userId` | `string` | Yes | 目标用户 ID |
+| `tagCode` | `string` | Yes | 标签代码 |
+
+#### 响应
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `hasTag` | `bool` | 用户是否拥有该标签 |
+
+#### 使用示例
+
+```java
+var result = ssoApi.merchant().checkUserHasTag(
+    CheckUserHasTagRequest.newBuilder()
+        .setUserId("user-123")
+        .setTagCode("vip")
+        .build()
+);
+
+if (result != null && result.getHasTag()) {
+    System.out.println("用户是 VIP");
+} else {
+    System.out.println("用户不是 VIP");
+}
+```
+
+## 公告系统
+
+### GetRecentAnnouncements
+
+获取当前应用所属商户的最近公告（最多 10 条）。
+
+**响应包含哈希值：** 返回结果包含 MD5 和 SHA256 哈希值，客户端可用于判断公告内容是否变化，决定是否需要重新展示。
+
+#### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `limit` | `int32` | No | 最大返回数量（默认 10） |
+| `activeOnly` | `bool` | No | 仅返回生效中的公告（默认 `true`） |
+
+#### 响应
+
+`RecentAnnouncementsResult` 包含以下字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `announcements` | `list` | 公告列表 |
+| `meta.md5Hash` | `string` | 整体 MD5 哈希值 |
+| `meta.sha256Hash` | `string` | 整体 SHA256 哈希值 |
+
+#### 使用示例
+
+```java
+var announcements = ssoApi.merchant().getRecentAnnouncements(
+    GetRecentAnnouncementsRequest.newBuilder()
+        .build()
+);
+
+if (announcements != null) {
+    System.out.printf("MD5: %s%n", announcements.getMeta().getMd5Hash());
+    System.out.printf("SHA256: %s%n", announcements.getMeta().getSha256Hash());
+
+    for (var ann : announcements.getAnnouncementsList()) {
+        System.out.printf("公告: %s%n", ann.getTitle());
+    }
+}
+```
+
+### GetAnnouncement
+
+根据公告 ID 获取详细信息。
+
+#### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `announcementId` | `string` | Yes | 公告 ID |
+
+#### 响应
+
+`AnnouncementResult` 包含以下字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | `string` | 公告 ID |
+| `title` | `string` | 公告标题 |
+| `content` | `string` | 公告内容 |
+| `scope` | `string` | 公告范围 |
+| `displayUntil` | `string` | 展示截止时间 |
+
+#### 使用示例
+
+```java
+var announcement = ssoApi.merchant().getAnnouncement(
+    GetAnnouncementRequest.newBuilder()
+        .setAnnouncementId("ann-123")
+        .build()
+);
+
+if (announcement != null) {
+    System.out.printf("标题: %s%n", announcement.getTitle());
+    System.out.printf("内容: %s%n", announcement.getContent());
+}
+```
+
+## 使用场景
+
+### 用户权限控制
+
+```java
+// 检查用户是否有管理员标签
+public boolean isAdmin(String userId) {
+    var result = ssoApi.merchant().checkUserHasTag(
+        CheckUserHasTagRequest.newBuilder()
+            .setUserId(userId)
+            .setTagCode("admin")
+            .build()
+    );
+    return result != null && result.getHasTag();
+}
+```
+
+### 功能开关
+
+```java
+// 根据用户标签决定是否启用某功能
+public boolean canAccessPremiumFeature(String userId) {
+    var tags = ssoApi.merchant().getUserTags(
+        GetUserTagsRequest.newBuilder()
+            .setUserId(userId)
+            .build()
+    );
+
+    if (tags == null) {
+        return false;
+    }
+
+    return tags.getTagsList().stream()
+        .anyMatch(tag -> "premium".equals(tag.getCode())
+            || "vip".equals(tag.getCode()));
+}
+```
+
+### 公告缓存
+
+```java
+// 使用哈希值判断公告是否变化
+public List<Announcement> getAnnouncementsWithCache(String cachedHash) {
+    var resp = ssoApi.merchant().getRecentAnnouncements(
+        GetRecentAnnouncementsRequest.newBuilder().build()
+    );
+
+    if (resp == null) {
+        return Collections.emptyList();
+    }
+
+    String currentHash = resp.getMeta().getMd5Hash();
+
+    if (currentHash.equals(cachedHash)) {
+        // 内容未变化，使用缓存
+        return Collections.emptyList();
+    }
+
+    // 内容已变化，返回新数据并更新缓存
+    return resp.getAnnouncementsList();
+}
+```
+
+## HTTP 路由
+
+SDK 提供以下 Merchant 相关 HTTP 路由：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/merchant/tags` | 获取商户标签列表 |
+| GET | `/merchant/users/{userId}/tags` | 获取用户标签列表 |
+| GET | `/merchant/announcements` | 获取最近公告列表 |
+| GET | `/merchant/announcements/{announcementId}` | 获取公告详情 |

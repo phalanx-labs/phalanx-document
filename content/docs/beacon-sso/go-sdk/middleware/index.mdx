@@ -1,0 +1,36 @@
+---
+title: 中间件
+description: Gin 中间件概览
+icon: Shield
+---
+
+# 中间件
+
+SDK 提供 Gin 中间件，用于在请求处理前进行身份验证。
+
+## 可用中间件
+
+| 中间件 | 说明 |
+|--------|------|
+| [CheckAuth](./auth-check) | Token 验证中间件 |
+
+## 使用示例
+
+```go
+import (
+    bSdkMiddleware "github.com/phalanx-labs/beacon-sso-sdk/middleware"
+)
+
+// 全局使用
+reg.Serve.Use(bSdkMiddleware.CheckAuth(reg.Init.Ctx))
+
+// 路由组使用
+api := reg.Serve.Group("/api")
+api.Use(bSdkMiddleware.CheckAuth(reg.Init.Ctx))
+
+// 单个路由使用
+reg.Serve.GET("/protected",
+    bSdkMiddleware.CheckAuth(reg.Init.Ctx),
+    handler,
+)
+```

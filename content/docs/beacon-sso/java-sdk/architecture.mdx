@@ -1,0 +1,154 @@
+---
+title: 架构设计
+description: Beacon SSO Java SDK 架构设计说明
+icon: Cubes
+---
+
+# 架构设计
+
+Beacon SSO Java SDK 采用多模块分层架构设计，基于 Spring Boot 自动配置机制实现零侵入集成。
+
+## 整体架构
+
+```mermaid
+graph TB
+    subgraph Application[应用层]
+        Controller[Controller<br/>自动注册的 REST 控制器]
+        Filter[BeaconSsoFilter<br/>Servlet 过滤器]
+        Aspect[AOP 切面<br/>@InjectData / @PermissionVerify]
+    end
+
+    subgraph Business[业务层]
+        AuthLogic[AuthLogic<br/>OAuth 逻辑]
+        UserLogic[UserLogic<br/>用户逻辑]
+        SsoApi[SsoApi<br/>统一 API 入口]
+    end
+
+    subgraph Client[客户端层]
+        HttpClient[WebClient<br/>HTTP 客户端]
+        GrpcClient[gRPC Stub<br/>gRPC 客户端]
+    end
+
+    subgraph Data[数据层]
+        Cache[Caffeine<br/>内存缓存]
+        Session[HTTP Session<br/>Token 存储]
+    end
+
+    subgraph External[外部服务]
+        SSOServer[SSO Server<br/>OAuth2 + gRPC]
+    end
+
+    Controller --> AuthLogic
+    Controller --> UserLogic
+    Filter --> UserLogic
+    Aspect --> Filter
+
+    AuthLogic --> SsoApi
+    UserLogic --> SsoApi
+
+    SsoApi --> HttpClient
+    SsoApi --> GrpcClient
+
+    AuthLogic --> Cache
+    AuthLogic --> Session
+    HttpClient --> SSOServer
+    GrpcClient --> SSOServer
+```
+
+## 多模块结构
+
+SDK 采用 Maven 多模块设计：
+
+| 模块 | Artifact | 说明 |
+|------|----------|------|
+| **bamboo-sso-base** | `bamboo-sso-base` | 核心模块：属性配置、gRPC/HTTP 客户端、数据模型、缓存、异常 |
+| **bamboo-sso-sdk-springboot** | `bamboo-sso-sdk-springboot` | Spring Boot Starter：自动配置、Filter、Controller、AOP 切面 |
+
+## Spring Boot 自动配置
+
+SDK 通过 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 注册自动配置类：
+
+| 配置类 | 条件 | 注册的 Bean |
+|--------|------|------------|
+| `AutoConfiguration` | `beacon.sso.enabled=true`（默认） | WebClient、SsoApi、CacheManager |
+| `BeaconSsoSpringBootAutoConfiguration` | Servlet Web 应用 | BeaconSsoFilter、Controllers、AOP 切面 |
+| `GrpcConfiguration` | `beacon.sso.grpc.enabled=true` | ManagedChannel |
+
+<Callout type="info">
+你只需引入 `bamboo-sso-sdk-springboot` 依赖并在 `application.yml` 中配置属性，所有 Bean 会自动注册到 Spring 容器中。
+</Callout>
+
+## SsoApi 统一入口
+
+`SsoApi` 是 SDK 的核心 Facade，通过 Spring IoC 容器注入使用：
+
+```java
+@Autowired
+private SsoApi ssoApi;
+
+// 账户服务（gRPC）
+ssoApi.account().registerByEmail(request);
+ssoApi.account().passwordLogin(request);
+
+// 用户服务（gRPC 优先，HTTP 回退）
+ssoApi.user().getCurrentUser(accessToken, request);
+
+// 商户服务（gRPC）
+ssoApi.merchant().getMerchantTags();
+
+// 公共服务（gRPC）
+ssoApi.pub().sendRegisterEmailCode(request);
+```
+
+| 子 API | 说明 | 传输方式 |
+|--------|------|----------|
+| `ssoApi.account()` | 账户管理（注册/登录/改密） | gRPC |
+| `ssoApi.user()` | 用户信息查询 | gRPC 优先，HTTP 回退 |
+| `ssoApi.merchant()` | 商户标签/公告 | gRPC |
+| `ssoApi.pub()` | 公共服务（验证码） | gRPC |
+
+## 双传输架构
+
+SDK 支持 HTTP 和 gRPC 两种传输方式：
+
+| 功能 | HTTP | gRPC | 说明 |
+|------|------|------|------|
+| OAuth2 登录流程 | 默认 | - | 始终使用 HTTP |
+| Token 自省 | 默认 | - | 始终使用 HTTP |
+| 获取当前用户 | 回退 | 优先 | gRPC 启用时优先使用 |
+| 按 ID 获取用户 | - | 仅 gRPC | 需启用 gRPC |
+| 邮箱注册/密码登录 | - | 仅 gRPC | 需启用 gRPC |
+| 商户标签/公告 | - | 仅 gRPC | 需启用 gRPC |
+
+## OAuth2 授权流程
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant App as 应用
+    participant Filter as BeaconSsoFilter
+    participant SDK as SDK
+    participant Cache as Caffeine
+    participant SSO as SSO Server
+
+    User->>App: GET /oauth/login
+    App->>SDK: AuthLogic.generateAuthorizationUrl()
+    SDK->>SDK: 生成 State + PKCE Code Verifier
+    SDK->>Cache: 缓存 OAuthState（15min TTL）
+    SDK-->>User: 302 重定向到 SSO 授权页面
+    User->>SSO: 授权
+    SSO-->>User: 重定向 /oauth/callback?code=xxx&state=xxx
+    User->>App: GET /oauth/callback
+    App->>SDK: AuthLogic.handleCallback()
+    SDK->>Cache: 验证 State，获取 Code Verifier
+    SDK->>SSO: POST /oauth/token（code + verifier）
+    SSO-->>SDK: Access Token + Refresh Token
+    SDK-->>User: 存入 HTTP Session，登录成功
+
+    User->>App: GET /api/profile（带 Bearer Token）
+    App->>Filter: 提取 Authorization Header
+    Filter->>SDK: Token 自省验证
+    Filter->>Filter: 存入 Request Attribute
+    Filter->>App: 继续过滤器链
+    App-->>User: 返回数据
+```

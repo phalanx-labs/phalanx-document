@@ -1,0 +1,5 @@
+{
+  "title": "高级话题",
+  "icon": "Settings",
+  "pages": ["index", "cache"]
+}

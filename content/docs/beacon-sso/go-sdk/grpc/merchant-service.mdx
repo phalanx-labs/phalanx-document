@@ -1,0 +1,177 @@
+---
+title: Merchant 服务
+description: 商户服务 API
+icon: Building
+---
+
+# Merchant 服务
+
+Merchant 服务提供商户标签和公告管理功能。
+
+<Callout type="warn">
+Merchant 服务需要在 metadata 中提供 App 凭证（`app-access-id` 和 `app-secret-key`）。
+</Callout>
+
+## 接口概览
+
+| 方法 | 说明 |
+|------|------|
+| `GetMerchantTags` | 获取商户标签列表 |
+| `GetUserTags` | 获取用户标签列表 |
+| `CheckUserHasTag` | 检查用户是否有指定标签 |
+| `GetRecentAnnouncements` | 获取最近公告列表 |
+| `GetAnnouncement` | 获取单个公告详情 |
+
+## 标签系统
+
+### GetMerchantTags
+
+获取当前应用所属商户的所有标签列表。
+
+```go
+import service "github.com/phalanx-labs/beacon-sso-sdk/client/service"
+
+tags, err := client.Merchant.GetMerchantTags(ctx, &service.GetMerchantTagsRequest{})
+if err != nil {
+    panic(err)
+}
+
+for _, tag := range tags.Tags {
+    fmt.Printf("标签: %s (%s)\n", tag.Name, tag.Code)
+}
+```
+
+### GetUserTags
+
+获取指定用户在当前商户的所有标签。
+
+```go
+tags, err := client.Merchant.GetUserTags(ctx, &service.GetUserTagsRequest{
+    UserId: "user-123",
+})
+
+for _, tag := range tags.Tags {
+    fmt.Printf("用户标签: %s\n", tag.Name)
+}
+```
+
+### CheckUserHasTag
+
+通过标签代码快速检查用户是否拥有该标签。
+
+```go
+result, err := client.Merchant.CheckUserHasTag(ctx, &service.CheckUserHasTagRequest{
+    UserId:  "user-123",
+    TagCode: "vip",
+})
+
+if result.HasTag {
+    fmt.Println("用户是 VIP")
+} else {
+    fmt.Println("用户不是 VIP")
+}
+```
+
+## 公告系统
+
+### GetRecentAnnouncements
+
+获取当前应用所属商户的最近公告（最多 10 条）。
+
+**响应包含哈希值：** 返回结果包含 MD5 和 SHA256 哈希值，客户端可用于判断公告内容是否变化，决定是否需要重新展示。
+
+```go
+announcements, err := client.Merchant.GetRecentAnnouncements(ctx, &service.GetRecentAnnouncementsRequest{})
+if err != nil {
+    panic(err)
+}
+
+for _, ann := range announcements.Announcements {
+    fmt.Printf("公告: %s\n", ann.Title)
+    fmt.Printf("  MD5: %s\n", ann.Md5Hash)
+    fmt.Printf("  SHA256: %s\n", ann.Sha256Hash)
+}
+```
+
+### GetAnnouncement
+
+根据公告 ID 获取详细信息。
+
+```go
+announcement, err := client.Merchant.GetAnnouncement(ctx, &service.GetAnnouncementRequest{
+    AnnouncementId: "ann-123",
+})
+
+if err != nil {
+    panic(err)
+}
+
+fmt.Printf("标题: %s\n", announcement.Title)
+fmt.Printf("内容: %s\n", announcement.Content)
+```
+
+## 使用场景
+
+### 用户权限控制
+
+```go
+// 检查用户是否有管理员标签
+func IsAdmin(ctx context.Context, client *bSdkClient.SsoClient, userId string) bool {
+    result, err := client.Merchant.CheckUserHasTag(ctx, &service.CheckUserHasTagRequest{
+        UserId:  userId,
+        TagCode: "admin",
+    })
+    if err != nil {
+        return false
+    }
+    return result.HasTag
+}
+```
+
+### 功能开关
+
+```go
+// 根据用户标签决定是否启用某功能
+func CanAccessPremiumFeature(ctx context.Context, client *bSdkClient.SsoClient, userId string) bool {
+    tags, err := client.Merchant.GetUserTags(ctx, &service.GetUserTagsRequest{
+        UserId: userId,
+    })
+    if err != nil {
+        return false
+    }
+
+    for _, tag := range tags.Tags {
+        if tag.Code == "premium" || tag.Code == "vip" {
+            return true
+        }
+    }
+    return false
+}
+```
+
+### 公告缓存
+
+```go
+// 使用哈希值判断公告是否变化
+type AnnouncementCache struct {
+    LastHash string
+    Content  []Announcement
+}
+
+func GetAnnouncementsWithCache(ctx context.Context, client *bSdkClient.SsoClient, cache *AnnouncementCache) []Announcement {
+    resp, _ := client.Merchant.GetRecentAnnouncements(ctx, &service.GetRecentAnnouncementsRequest{})
+
+    // 计算整体哈希
+    currentHash := calculateCombinedHash(resp.Announcements)
+
+    if currentHash == cache.LastHash {
+        // 内容未变化，使用缓存
+        return cache.Content
+    }
+
+    // 内容已变化，更新缓存
+    cache.LastHash = currentHash
+    cache.Content = resp.Announcements
+    return cache.Content
+}
+```

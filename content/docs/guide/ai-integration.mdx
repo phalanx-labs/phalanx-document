@@ -1,0 +1,85 @@
+---
+title: AI 集成
+description: 让 AI 助手直接读取竹简文档内容
+icon: Bot
+---
+
+# AI 集成
+
+本站原生支持 LLM（大语言模型）友好协议，你可以让 AI 助手直接读取文档内容，获得更精准的技术支持。
+
+<Callout type="info" title="文档访问基础路径（BaseURI）">
+本文档站所有 LLM 可访问资源的根路径为：
+
+```
+https://doc.x-lf.com
+```
+
+后续所有路径示例均为**相对路径**，使用时请拼接上方根路径。
+</Callout>
+
+## 使用方式
+
+### 方式一：文档索引
+
+访问 `/llms.txt` 获取所有文档页面的索引列表，然后按需请求单页内容。
+
+```
+https://doc.x-lf.com/llms.txt
+```
+
+### 方式二：单页 MDX 模式
+
+每个文档页面都支持 MDX 原始内容获取，在路径后加 `.mdx` 前缀即可：
+
+```
+https://doc.x-lf.com/llms.mdx/docs/bamboo-base-go/quick-start
+https://doc.x-lf.com/llms.mdx/docs/bamboo-base-java/quick-start
+```
+
+### 推荐方式（方式一 + 方式二结合）
+
+**先读索引，再按需拉取单页内容**——这是最高效的使用策略：
+
+1. 访问 `/llms.txt` 获取所有页面的索引列表
+2. 从索引中定位与问题相关的页面路径
+3. 访问 `/llms.mdx/<path>` 获取该页面的完整内容
+4. 基于内容回答问题
+
+这样可以避免一次性加载全量文档，让 AI 只获取真正需要的内容。
+
+## Claude Code 集成
+
+如果你使用 Claude Code 命令行工具，可以通过 MCP 服务直接集成竹简文档，让 Claude 自动获取所需文档内容。
+
+<Cards>
+  <Card title="Claude Code 集成指南" href="./claude-code" icon="Terminal" description="查看完整的 Claude Code MCP 配置教程" />
+</Cards>
+
+## Agent Prompt 模板
+
+以下 prompt 可直接复制到任意支持网络请求的 AI Agent 中使用：
+
+```markdown
+请按以下步骤获取竹简文档并回答我的问题：
+
+1. 获取文档索引：https://doc.x-lf.com/llms.txt
+2. 从索引中找到与我的问题相关的页面路径
+3. 获取该页面内容：https://doc.x-lf.com/llms.mdx/<找到的路径>
+4. 基于文档内容回答：[你的问题]
+```
+
+<Callout type="tip" title="提示">
+将上述 prompt 复制到 Claude、ChatGPT、Cursor 或其他支持网络请求的 AI 工具中，替换最后一行为你的具体问题，即可自动获取并分析文档内容。
+</Callout>
+
+## 相关链接
+
+- [LLM 协议文件](/llms.txt) - 文档索引
+- [完整文档](/llms-full.txt) - 所有内容合并
+- [页面操作](./navigation) - 每页可复制 MDX 源码
+
+## 参考资料
+
+- **bamboo-base-go 全局文档**: https://doc.x-lf.com/llms.txt
+- **具体路径查询**: `https://doc.x-lf.com/llms.mdx/<search_path>`

@@ -1,0 +1,23 @@
+{
+  "title": "Java SDK",
+  "icon": "Coffee",
+  "description": "Beacon SSO SDK Java 版本",
+  "pages": [
+    "index",
+    "quick-start",
+    "configuration",
+    "architecture",
+    "---OAuth2 子系统---",
+    "oauth2",
+    "---gRPC 服务---",
+    "grpc",
+    "---Filter 过滤器---",
+    "filter",
+    "---AOP 切面---",
+    "aop",
+    "---高级话题---",
+    "advanced",
+    "---API 参考---",
+    "api"
+  ]
+}

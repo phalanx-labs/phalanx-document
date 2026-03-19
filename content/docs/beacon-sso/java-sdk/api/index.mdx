@@ -1,0 +1,33 @@
+---
+title: API 参考
+description: API 参考文档概览
+icon: Book
+---
+
+# API 参考
+
+本章节提供 SDK 的完整 API 参考。
+
+## 子文档
+
+<CardGroup cols={2}>
+  <Card title="数据模型" href="./models">
+    所有数据模型的字段说明
+  </Card>
+  <Card title="错误处理" href="./errors">
+    错误码与异常体系参考
+  </Card>
+</CardGroup>
+
+## 核心包
+
+| 包路径 | 说明 |
+|--------|------|
+| `com.frontleaves.phalanx.beacon.sso.sdk.base.client` | SsoApi、SsoWebClient — 统一 API 入口与 HTTP 客户端 |
+| `com.frontleaves.phalanx.beacon.sso.sdk.base.api` | SsoOAuthApi、SsoAccountApi、SsoUserApi、SsoMerchantApi、SsoPublicApi — 子服务 API |
+| `com.frontleaves.phalanx.beacon.sso.sdk.base.config` | AutoConfiguration、BeaconSsoProperties — 自动配置与属性 |
+| `com.frontleaves.phalanx.beacon.sso.sdk.base.models` | Request/Result 数据模型 |
+| `com.frontleaves.phalanx.beacon.sso.sdk.base.exception` | 异常体系 |
+| `com.frontleaves.phalanx.beacon.sso.sdk.springboot.filter` | BeaconSsoFilter — Servlet 过滤器 |
+| `com.frontleaves.phalanx.beacon.sso.sdk.springboot.annotation` | @InjectData、@PermissionVerify — AOP 注解 |
+| `com.frontleaves.phalanx.beacon.sso.sdk.springboot.utility` | SsoSecurityUtil、SsoResponseUtil — 工具类 |

@@ -1,0 +1,14 @@
+{
+  "title": "入门指南",
+  "icon": "BookOpen",
+  "description": "快速了解竹简文档",
+  "root": true,
+  "defaultOpen": true,
+  "pages": [
+    "index",
+    "navigation",
+    "---AI 使用---",
+    "ai-integration",
+    "claude-code"
+  ]
+}

@@ -1,0 +1,231 @@
+---
+title: 数据模型
+description: SDK 数据模型参考
+icon: Database
+---
+
+# 数据模型
+
+本页面列出 SDK 中所有核心数据模型。
+
+## OAuth2 模型
+
+### CacheOAuth
+
+OAuth2 State 和 PKCE Verifier 的缓存模型。
+
+```go
+type CacheOAuth struct {
+    State    string // 随机状态码（32 位大写字母）
+    Verifier string // PKCE Code Verifier
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `State` | string | 用于验证请求完整性的随机状态码 |
+| `Verifier` | string | PKCE 流程的 Code Verifier |
+
+**Redis Key:** `oauth:state:{state}`
+**TTL:** 15 分钟
+
+---
+
+### CacheOAuthToken
+
+OAuth2 Token 的缓存模型。
+
+```go
+type CacheOAuthToken struct {
+    AccessToken  string // 访问令牌
+    TokenType    string // 令牌类型（Bearer）
+    RefreshToken string // 刷新令牌
+    Expiry       string // 过期时间（RFC3339 格式）
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `AccessToken` | string | 访问令牌 |
+| `TokenType` | string | 令牌类型，通常为 "Bearer" |
+| `RefreshToken` | string | 用于刷新 Access Token |
+| `Expiry` | string | 过期时间，RFC3339 格式 |
+
+**Redis Key:** `oauth:token:{accessToken}`
+**TTL:** 30 天
+
+---
+
+### OAuthUserinfo
+
+OAuth2 Userinfo Endpoint 的响应模型。
+
+```go
+type OAuthUserinfo struct {
+    Sub               string         // 用户唯一标识
+    Nickname          string         // 昵称
+    PreferredUsername string         // 首选用户名
+    Email             string         // 邮箱
+    Phone             string         // 手机号
+    Raw               map[string]any // 原始响应数据
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `Sub` | string | 用户唯一标识（来自 OIDC） |
+| `Nickname` | string | 用户昵称 |
+| `PreferredUsername` | string | 用户首选用户名 |
+| `Email` | string | 用户邮箱 |
+| `Phone` | string | 用户手机号 |
+| `Raw` | map[string]any | 原始 JSON 响应，包含扩展字段 |
+
+**Redis Key:** `oauth:biz:userinfo:{accessToken}`
+**TTL:** 30 秒（受 `SSO_BUSINESS_CACHE` 控制）
+
+---
+
+### OAuthIntrospection
+
+OAuth2 Introspection Endpoint 的响应模型。
+
+```go
+type OAuthIntrospection struct {
+    Active     bool           // 令牌是否有效
+    TokenType  string         // 令牌类型
+    Exp        int64          // 过期时间戳（Unix）
+    Expiry     string         // 过期时间（RFC3339）
+    ExpiresIn  int64          // 剩余有效时间（秒）
+    IsExpired  bool           // 是否已过期
+    Raw        map[string]any // 原始响应数据
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `Active` | bool | 令牌是否有效 |
+| `TokenType` | string | 令牌类型 |
+| `Exp` | int64 | 过期时间戳（Unix 秒） |
+| `Expiry` | string | 过期时间（RFC3339 格式） |
+| `ExpiresIn` | int64 | 剩余有效时间（秒） |
+| `IsExpired` | bool | 是否已过期 |
+| `Raw` | map[string]any | 原始 JSON 响应 |
+
+**Redis Key:** `oauth:biz:introspection:{tokenType}:{token}`
+**TTL:** 动态（取 min(expiresIn, 30s)）
+
+---
+
+## 业务缓存模型
+
+### CacheBusinessUserinfo
+
+业务层 Userinfo 的 Redis Hash 存储模型。
+
+```go
+type CacheBusinessUserinfo struct {
+    Sub     string // 用户唯一标识
+    Raw     string // 原始 JSON 字符串
+}
+```
+
+---
+
+### CacheBusinessIntrospection
+
+业务层 Introspection 的 Redis Hash 存储模型。
+
+```go
+type CacheBusinessIntrospection struct {
+    Active    bool   // 令牌是否有效
+    TokenType string // 令牌类型
+    Exp       int64  // 过期时间戳
+    ExpiresIn int64  // 剩余有效时间
+    IsExpired bool   // 是否已过期
+    Raw       string // 原始 JSON 字符串
+}
+```
+
+---
+
+## gRPC 消息类型
+
+### SendRegisterEmailCodeRequest
+
+```go
+type SendRegisterEmailCodeRequest struct {
+    Email string // 目标邮箱地址
+}
+```
+
+### RegisterByEmailRequest
+
+```go
+type RegisterByEmailRequest struct {
+    Email    string // 邮箱地址
+    Code     string // 验证码
+    Username string // 用户名
+    Password string // 密码
+    Nickname string // 昵称（可选）
+}
+```
+
+### RegisterByEmailResponse
+
+```go
+type RegisterByEmailResponse struct {
+    UserId       string // 用户 ID
+    AccessToken  string // 访问令牌
+    RefreshToken string // 刷新令牌
+    ExpiresIn    int64  // 过期时间（秒）
+}
+```
+
+### PasswordLoginRequest
+
+```go
+type PasswordLoginRequest struct {
+    Username string // 用户名/邮箱/手机号
+    Password string // 密码
+    Scope    string // 权限范围
+}
+```
+
+### PasswordLoginResponse
+
+```go
+type PasswordLoginResponse struct {
+    AccessToken  string // 访问令牌
+    TokenType    string // 令牌类型
+    RefreshToken string // 刷新令牌
+    ExpiresIn    int64  // 过期时间（秒）
+    IdToken      string // ID Token（可选）
+}
+```
+
+### ChangePasswordRequest
+
+```go
+type ChangePasswordRequest struct {
+    UserId            string // 用户 ID
+    OldPassword       string // 旧密码（普通模式必填）
+    NewPassword       string // 新密码
+    NeedResetPassword bool   // 是否强制重置模式
+}
+```
+
+### RevokeTokenRequest
+
+```go
+type RevokeTokenRequest struct {
+    TokenTypeHint string // 令牌类型提示（可选）
+}
+```
+
+### GetUserByIDRequest
+
+```go
+type GetUserByIDRequest struct {
+    UserId string // 用户 ID
+}
+```

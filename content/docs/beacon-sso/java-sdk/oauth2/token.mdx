@@ -1,0 +1,120 @@
+---
+title: Token 管理
+description: Token 的存储、刷新和注销机制
+icon: Key
+---
+
+# Token 管理
+
+本文档介绍 Token 的数据模型、存储方式、刷新策略和注销流程。
+
+## TokenResult 模型
+
+SDK 使用 `TokenResult` 模型表示 Token 信息：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `accessToken` | `String` | 访问令牌，用于 API 请求认证 |
+| `tokenType` | `String` | 令牌类型，固定为 `Bearer` |
+| `expiresIn` | `Long` | 访问令牌有效期（秒） |
+| `refreshToken` | `String` | 刷新令牌，用于获取新的 Access Token |
+| `scope` | `String` | 授权范围 |
+| `createdAt` | `Long` | Token 创建时间戳 |
+
+## Token 存储方式
+
+Java SDK 使用 **HTTP Session** 存储 Token（OAuth2 回调成功后自动写入）：
+
+| 特性 | 说明 |
+|------|------|
+| 存储位置 | Servlet HTTP Session |
+| 存储时机 | OAuth2 回调成功、密码登录成功 |
+| 读取方式 | `request.getSession().getAttribute(...)` |
+| 清除时机 | 用户注销或 Session 过期 |
+
+<Callout type="info">
+与 Go SDK 使用 Redis 缓存不同，Java SDK 利用 Servlet 容器内置的 HTTP Session 机制管理 Token，无需引入外部存储依赖。
+</Callout>
+
+## Token 刷新
+
+使用 `AuthLogic.refreshToken()` 方法通过 Refresh Token 获取新的 Access Token：
+
+```java
+@Autowired
+private AuthLogic authLogic;
+
+TokenResult newToken = authLogic.refreshToken(refreshToken);
+```
+
+**流程说明：**
+
+1. 使用 Refresh Token 向 SSO Server 发起刷新请求
+2. SSO Server 验证 Refresh Token 有效性
+3. 返回新的 `TokenResult`（包含新的 Access Token 和 Refresh Token）
+4. 新 Token 写入当前 HTTP Session
+
+## Token 撤销
+
+SDK 提供 `AuthLogic.revokeToken()` 方法，遵循 [RFC 7009](https://tools.ietf.org/html/rfc7009) 规范注销 Token：
+
+```java
+@Autowired
+private AuthLogic authLogic;
+
+// 注销指定 Token（默认为 access_token）
+authLogic.revokeToken(token);
+
+// 指定 Token 类型注销
+authLogic.revokeToken(token, "refresh_token");
+```
+
+**参数说明：**
+
+| 参数 | 说明 |
+|------|------|
+| `token` | 待注销的令牌值 |
+| `tokenType` | 令牌类型提示：`access_token` 或 `refresh_token`（可选） |
+
+**流程说明：**
+
+1. 向 SSO Server 的 `/oauth/revoke` 端点发送注销请求
+2. SSO Server 标记该 Token 为已撤销
+3. 清除本地 HTTP Session 中的 Token 数据
+
+## Token 验证
+
+SDK 通过 `UserLogic` 提供两种 Token 验证方式：
+
+### Token 自省（Introspection）
+
+```java
+@Autowired
+private UserLogic userLogic;
+
+IntrospectResult result = userLogic.introspectToken(accessToken);
+```
+
+调用 SSO Server 的自省端点，返回 Token 的详细信息（是否有效、所属用户、过期时间等）。
+
+### Token 验证（Validation）
+
+```java
+ValidateResult result = userLogic.validateToken(accessToken);
+```
+
+验证 Token 是否有效，返回简化的验证结果。
+
+<Callout type="info">
+`BeaconSsoFilter` 内部会自动调用 Token 自省接口验证每个请求的 Bearer Token，并将结果存入 Request Attribute，供 `@InjectData` 注解使用。
+</Callout>
+
+## HTTP 路由参考
+
+SDK 提供以下 Token 相关路由：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/oauth/logout` | 注销 Token 并清除 Session |
+| GET | `/oauth/status` | 获取当前认证状态 |
+| POST | `/account/logout` | 注销 Token（gRPC，需认证） |

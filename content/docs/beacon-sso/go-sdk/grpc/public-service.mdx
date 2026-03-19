@@ -1,0 +1,92 @@
+---
+title: Public 服务
+description: 公共服务 API
+icon: Globe
+---
+
+# Public 服务
+
+Public 服务提供无需认证的公共功能，主要用于发送验证码。
+
+## 接口概览
+
+| 方法 | 说明 | 认证 |
+|------|------|------|
+| `SendRegisterEmailCode` | 发送注册邮箱验证码 | 无 |
+
+## SendRegisterEmailCode
+
+发送注册邮箱验证码。
+
+### 请求参数
+
+```go
+type SendRegisterEmailCodeRequest struct {
+    Email string // 目标邮箱地址
+}
+```
+
+### 响应
+
+```go
+type SendRegisterEmailCodeResponse struct {
+    // 基础响应信息
+}
+```
+
+### 使用示例
+
+```go
+import (
+    "context"
+    bSdkClient "github.com/phalanx-labs/beacon-sso-sdk/client"
+    pb "github.com/phalanx-labs/beacon-sso-sdk/client/api/beacon/sso/v1"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // 创建客户端（Public 服务无需 App 凭证）
+    client := bSdkClient.NewClient(
+        bSdkClient.WithConnect("sso.example.com", "5566"),
+    )
+
+    // 发送验证码
+    _, err := client.Public.SendRegisterEmailCode(ctx, &pb.SendRegisterEmailCodeRequest{
+        Email: "user@example.com",
+    })
+    if err != nil {
+        panic(err)
+    }
+
+    println("验证码已发送")
+}
+```
+
+### 限制说明
+
+| 限制 | 说明 |
+|------|------|
+| 有效期 | 15 分钟（可通过 `EMAIL_VERIFY_CODE_EXPIRE` 环境变量配置） |
+| 频率限制 | 同一邮箱 1 分钟内只能发送一次 |
+
+### 错误码
+
+| 错误 | 说明 |
+|------|------|
+| `invalid_argument` | 邮箱格式无效 |
+| `resource_exhausted` | 发送频率超限 |
+| `unavailable` | 邮件服务不可用 |
+
+## HTTP 路由
+
+SDK 同时提供 HTTP 路由封装：
+
+```bash
+POST /api/account/register/email-code
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+```

@@ -1,0 +1,5 @@
+{
+  "title": "AOP 切面",
+  "icon": "Scissors",
+  "pages": ["index", "inject-data", "permission-verify"]
+}

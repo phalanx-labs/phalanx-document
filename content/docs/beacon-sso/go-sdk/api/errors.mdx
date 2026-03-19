@@ -1,0 +1,193 @@
+---
+title: 错误码
+description: SDK 错误码参考
+icon: AlertTriangle
+---
+
+# 错误码
+
+SDK 使用 bamboo-base-go 的统一错误处理体系。
+
+## 错误结构
+
+所有错误都遵循统一的结构：
+
+```go
+type Error struct {
+    ErrorCode    ErrorCode    // 错误码
+    ErrorMessage string       // 错误消息
+    Data         any          // 附加数据
+}
+```
+
+## 常见错误码
+
+### 参数错误
+
+| 错误码 | 说明 | HTTP 状态码 |
+|--------|------|-------------|
+| `ParameterEmpty` | 必填参数为空 | 400 |
+| `ParameterError` | 参数格式错误 | 400 |
+
+### 认证错误
+
+| 错误码 | 说明 | HTTP 状态码 |
+|--------|------|-------------|
+| `Unauthorized` | 未登录或 Token 无效 | 401 |
+| `TokenExpired` | Token 已过期 | 401 |
+
+### 资源错误
+
+| 错误码 | 说明 | HTTP 状态码 |
+|--------|------|-------------|
+| `NotExist` | 资源不存在 | 404 |
+
+### 操作错误
+
+| 错误码 | 说明 | HTTP 状态码 |
+|--------|------|-------------|
+| `OperationFailed` | 操作失败 | 500 |
+
+## 错误响应示例
+
+### 参数为空
+
+```json
+{
+  "code": 400,
+  "message": "状态为空",
+  "data": null
+}
+```
+
+### Token 过期
+
+```json
+{
+  "code": 401,
+  "message": "访问令牌已过期",
+  "data": null
+}
+```
+
+### 未登录
+
+```json
+{
+  "code": 401,
+  "message": "未登录",
+  "data": null
+}
+```
+
+## 错误处理
+
+### 在 Handler 中
+
+```go
+import xResult "github.com/bamboo-services/bamboo-base-go/major/result"
+
+func handler(c *gin.Context) {
+    result, err := someLogic.DoSomething(ctx)
+    if err != nil {
+        xResult.AbortError(c, err.ErrorCode, err.ErrorMessage, err.Data)
+        return
+    }
+    xResult.SuccessHasData(c, "操作成功", result)
+}
+```
+
+### 在 Logic 层
+
+```go
+import xError "github.com/bamboo-services/bamboo-base-go/common/error"
+
+func (l *SomeLogic) DoSomething(ctx context.Context) (*Result, *xError.Error) {
+    if someCondition {
+        return nil, xError.NewError(ctx, xError.ParameterEmpty, "参数为空", false, nil)
+    }
+
+    if someError {
+        return nil, xError.NewError(ctx, xError.OperationFailed, "操作失败", false, someErr)
+    }
+
+    return &Result{}, nil
+}
+```
+
+## OAuth2 特定错误
+
+### State 验证失败
+
+```json
+{
+  "code": 401,
+  "message": "验证器不存在",
+  "data": null
+}
+```
+
+**原因：**
+- State 不存在或已过期
+- State 已被使用（重放攻击）
+
+### Code 换取 Token 失败
+
+```json
+{
+  "code": 401,
+  "message": "未登录",
+  "data": null
+}
+```
+
+**原因：**
+- 授权码无效或已过期
+- PKCE Verifier 不匹配
+- 客户端凭证错误
+
+## gRPC 错误
+
+Connect-RPC 使用标准的 gRPC 错误码：
+
+| 错误码 | 说明 |
+|--------|------|
+| `canceled` | 操作被取消 |
+| `unknown` | 未知错误 |
+| `invalid_argument` | 参数无效 |
+| `deadline_exceeded` | 超时 |
+| `not_found` | 资源不存在 |
+| `already_exists` | 资源已存在 |
+| `permission_denied` | 权限不足 |
+| `unauthenticated` | 未认证 |
+| `resource_exhausted` | 资源耗尽 |
+| `unavailable` | 服务不可用 |
+
+### 处理 gRPC 错误
+
+```go
+import "connectrpc.com/connect"
+
+resp, err := client.Auth.PasswordLogin(ctx, req)
+if err != nil {
+    if connectErr, ok := err.(*connect.Error); ok {
+        switch connectErr.Code() {
+        case connect.CodeUnauthenticated:
+            // 认证失败
+        case connect.CodeInvalidArgument:
+            // 参数无效
+        case connect.CodeUnavailable:
+            // 服务不可用
+        }
+    }
+    return
+}
+```
+
+## 错误处理最佳实践
+
+1. **始终检查错误** - 不要忽略任何错误返回值
+2. **使用适当的日志级别** - 错误用 Error，警告用 Warn
+3. **提供有意义的错误信息** - 便于调试和用户理解
+4. **不要暴露敏感信息** - 如 Token、密码等
+5. **区分客户端和服务端错误** - 4xx vs 5xx

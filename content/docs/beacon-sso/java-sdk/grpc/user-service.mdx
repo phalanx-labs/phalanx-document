@@ -1,0 +1,126 @@
+---
+title: User 服务
+description: 用户信息查询服务
+icon: User
+---
+
+# User 服务
+
+User 服务提供用户信息查询功能，支持获取当前登录用户和按 ID 查询指定用户。
+
+<Callout type="warn">
+User 服务需要在 metadata 中提供 App 凭证和用户 Token，由 SDK 自动处理。
+</Callout>
+
+## 接口概览
+
+| 方法 | 说明 | Token 来源 | 传输方式 |
+|------|------|-----------|----------|
+| `GetCurrentUser` | 获取当前登录用户信息 | 从参数中传入 | gRPC 优先，HTTP 回退 |
+| `GetUserByID` | 根据用户 ID 获取信息 | 需要提供 user_id | 仅 gRPC |
+
+## GetCurrentUser
+
+获取当前登录用户的详细信息。当 gRPC 启用时优先使用 gRPC 传输；当 gRPC 未启用时自动回退到 HTTP 方式。
+
+### 请求参数
+
+无需额外请求参数，通过 `accessToken` 标识当前用户。
+
+### 响应
+
+`UserDetailResult` 包含以下字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | `string` | 用户 ID |
+| `username` | `string` | 用户名 |
+| `nickname` | `string` | 昵称 |
+| `email` | `string` | 邮箱 |
+| `phone` | `string` | 手机号 |
+| `avatar` | `string` | 头像 URL |
+| `status` | `int32` | 状态 |
+| `roles` | `list` | 角色列表 |
+| `createdAt` | `string` | 创建时间 |
+| `updatedAt` | `string` | 更新时间 |
+
+### 使用示例
+
+```java
+// 假设 accessToken 来自登录响应或请求头
+String accessToken = "eyJhbGciOiJSUzI1NiIs...";
+
+// 获取当前用户信息
+var user = ssoApi.user().getCurrentUser(accessToken);
+if (user == null) {
+    throw new RuntimeException("获取用户信息失败");
+}
+
+System.out.printf("用户 ID: %s%n", user.getId());
+System.out.printf("用户名: %s%n", user.getUsername());
+System.out.printf("邮箱: %s%n", user.getEmail());
+```
+
+## GetUserByID
+
+根据用户 ID 获取指定用户的详细信息。主要用于接入 App 需要获取其他用户信息的场景。
+
+### 与 GetCurrentUser 的区别
+
+| 方法 | 信息来源 | 传输方式 | 用途 |
+|------|---------|----------|------|
+| `GetCurrentUser` | 从 Token 中获取 | gRPC 优先，HTTP 回退 | 获取当前登录用户信息 |
+| `GetUserByID` | 通过 userId 参数 | 仅 gRPC | 获取任意用户信息 |
+
+### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `userId` | `string` | Yes | 目标用户 ID |
+
+### 响应
+
+与 `GetCurrentUser` 相同，返回 `UserDetailResult`。
+
+### 使用示例
+
+```java
+// 获取指定用户信息
+var user = ssoApi.user().getUserById(
+    accessToken,
+    GetUserByIdRequest.newBuilder()
+        .setUserId("target-user-123")
+        .build()
+);
+
+if (user == null) {
+    throw new RuntimeException("获取用户信息失败");
+}
+
+System.out.printf("用户名: %s%n", user.getUsername());
+```
+
+<Callout type="warn">
+`GetUserByID` 仅在 gRPC 启用时可用。若 gRPC 未启用，将抛出 `SsoConfigurationException(GRPC_NOT_ENABLED)` 异常。
+</Callout>
+
+## HTTP 路由
+
+SDK 提供以下 User 相关 HTTP 路由：
+
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/user/userinfo` | CheckAuth | 获取当前用户信息 |
+| GET | `/user/{userId}` | CheckAuth | 根据 ID 获取用户信息 |
+
+### 请求示例
+
+```bash
+# 获取当前用户信息
+GET /user/userinfo HTTP/1.1
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+
+# 根据 ID 获取用户信息
+GET /user/target-user-123 HTTP/1.1
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+```

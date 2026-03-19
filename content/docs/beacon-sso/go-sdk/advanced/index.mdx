@@ -1,0 +1,84 @@
+---
+title: 高级话题
+description: 高级配置与定制
+icon: Settings
+---
+
+# 高级话题
+
+本章节介绍 SDK 的高级配置和定制选项。
+
+## 子文档
+
+<CardGroup cols={2}>
+  <Card title="缓存策略" href="./cache">
+    了解 SDK 的 Redis 缓存机制和配置选项
+  </Card>
+</CardGroup>
+
+## 自定义初始化
+
+### 排除特定节点
+
+你可以通过 `exclude` 参数排除不需要的初始化节点：
+
+```go
+// 仅使用 OAuth2，排除 gRPC 客户端
+nodes := bSdkStartup.NewStartupConfig("ssoClient")
+
+// 排除 OAuth 配置（使用自定义 OAuth 配置）
+nodes := bSdkStartup.NewStartupConfig("oAuthConfig", "oAuthRedirectURI")
+```
+
+### 可排除的节点
+
+| 节点名称 | 说明 |
+|---------|------|
+| `oAuthConfig` | OAuth2 核心配置 |
+| `oAuthRedirectURI` | OAuth2 重定向地址 |
+| `ssoClient` | SsoClient gRPC 客户端 |
+
+## 独立使用 Logic 层
+
+你可以直接实例化 Logic 层，而不使用 SDK 提供的路由：
+
+```go
+import bSdkLogic "github.com/phalanx-labs/beacon-sso-sdk/logic"
+
+func customHandler(c *gin.Context) {
+    ctx := c.Request.Context()
+
+    // 使用 OAuthLogic
+    oauthLogic := bSdkLogic.NewOAuth(ctx)
+
+    // 使用 AuthLogic
+    authLogic := bSdkLogic.NewAuth(ctx)
+
+    // 使用 UserLogic
+    userLogic := bSdkLogic.NewUser(ctx)
+
+    // 使用 BusinessLogic
+    businessLogic := bSdkLogic.NewBusiness(ctx)
+}
+```
+
+## 直接使用 gRPC 客户端
+
+如果不需要 OAuth2 功能，可以只使用 gRPC 客户端：
+
+```go
+import bSdkClient "github.com/phalanx-labs/beacon-sso-sdk/client"
+
+func main() {
+    // 仅创建 gRPC 客户端
+    client := bSdkClient.NewClient(
+        bSdkClient.WithConnect("sso.example.com", "5566"),
+        bSdkClient.WithAppAccess("app-id", "app-secret"),
+    )
+
+    // 使用 gRPC 服务
+    client.Auth.PasswordLogin(ctx, req)
+    client.User.GetCurrentUser(ctx, token)
+    client.Merchant.GetMerchantTags(ctx, req)
+}
+```

@@ -1,0 +1,162 @@
+---
+title: 缓存策略
+description: Redis 缓存机制与配置
+icon: Database
+---
+
+# 缓存策略
+
+SDK 使用 Redis 进行多层次缓存，以提升性能和减少对 SSO Server 的请求。
+
+## 缓存层级
+
+```mermaid
+graph TB
+    subgraph SDK[Beacon SSO SDK]
+        OAuthRepo[OAuthRepo<br/>State/PKCE]
+        OAuthTokenRepo[OAuthTokenRepo<br/>Token]
+        UserinfoRepo[UserinfoRepo<br/>用户信息]
+        IntrospectionRepo[IntrospectionRepo<br/>令牌自省]
+    end
+
+    subgraph Redis[(Redis)]
+        Cache1[oauth:state:*]
+        Cache2[oauth:token:*]
+        Cache3[oauth:biz:userinfo:*]
+        Cache4[oauth:biz:introspection:*]
+    end
+
+    OAuthRepo --> Cache1
+    OAuthTokenRepo --> Cache2
+    UserinfoRepo --> Cache3
+    IntrospectionRepo --> Cache4
+```
+
+## 缓存详情
+
+### OAuth2 核心缓存
+
+| 缓存类型 | Key 模板 | TTL | 可控 |
+|----------|---------|-----|------|
+| State/PKCE | `oauth:state:{state}` | 15 分钟 | 否 |
+| Token | `oauth:token:{accessToken}` | 30 天 | 否 |
+
+**说明：** OAuth2 核心缓存始终启用，无法关闭。
+
+### 业务缓存
+
+| 缓存类型 | Key 模板 | TTL | 可控 |
+|----------|---------|-----|------|
+| Userinfo | `oauth:biz:userinfo:{accessToken}` | 30 秒 | 是 |
+| Introspection | `oauth:biz:introspection:{tokenType}:{token}` | 动态 | 是 |
+
+**动态 TTL 计算：**
+Introspection 的 TTL 取 `min(expiresIn, 30s)`，确保不会缓存已过期的结果。
+
+## 业务缓存开关
+
+通过 `SSO_BUSINESS_CACHE` 环境变量控制：
+
+```bash
+# 开启业务缓存（默认关闭）
+SSO_BUSINESS_CACHE=true
+```
+
+### 开启缓存的影响
+
+| 影响 | 说明 |
+|------|------|
+| **性能提升** | 减少对 SSO Server 的 HTTP 请求 |
+| **数据延迟** | 用户信息变更最多延迟 30 秒 |
+| **内存占用** | Redis 占用增加 |
+
+<Callout type="warn">
+开启业务缓存后，用户信息变更（如修改昵称）可能会有最多 30 秒的延迟。如果你的应用需要实时的用户信息，请保持缓存关闭。
+</Callout>
+
+## 使用 BusinessLogic
+
+BusinessLogic 提供 Userinfo 和 Introspection 能力，缓存逻辑已内置：
+
+```go
+import bSdkLogic "github.com/phalanx-labs/beacon-sso-sdk/logic"
+
+func main() {
+    ctx := context.Background()
+    businessLogic := bSdkLogic.NewBusiness(ctx)
+
+    // 获取用户信息（带缓存）
+    userinfo, err := businessLogic.Userinfo(ctx, accessToken)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("用户: %s\n", userinfo.Nickname)
+
+    // 查询令牌状态（带缓存）
+    intro, err := businessLogic.Introspection(ctx, "access_token", accessToken)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("令牌状态: %v\n", intro.Active)
+    fmt.Printf("过期时间: %s\n", intro.Expiry)
+}
+```
+
+## 手动清理缓存
+
+如果需要在用户信息变更后立即清理缓存：
+
+```go
+// 目前需要直接操作 Redis
+rdb.Del(ctx, "oauth:biz:userinfo:"+accessToken)
+rdb.Del(ctx, "oauth:biz:introspection:access_token:"+accessToken)
+```
+
+## 缓存模型
+
+### CacheOAuth
+
+```go
+type CacheOAuth struct {
+    State    string // 随机状态码
+    Verifier string // PKCE 验证器
+}
+```
+
+### CacheOAuthToken
+
+```go
+type CacheOAuthToken struct {
+    AccessToken  string // 访问令牌
+    TokenType    string // 令牌类型
+    RefreshToken string // 刷新令牌
+    Expiry       string // 过期时间（RFC3339）
+}
+```
+
+### OAuthUserinfo
+
+```go
+type OAuthUserinfo struct {
+    Sub              string         // 用户唯一标识
+    Nickname         string         // 昵称
+    PreferredUsername string        // 首选用户名
+    Email            string         // 邮箱
+    Phone            string         // 手机号
+    Raw              map[string]any // 原始响应数据
+}
+```
+
+### OAuthIntrospection
+
+```go
+type OAuthIntrospection struct {
+    Active     bool           // 令牌是否有效
+    TokenType  string         // 令牌类型
+    Exp        int64          // 过期时间戳（Unix）
+    Expiry     string         // 过期时间（RFC3339）
+    ExpiresIn  int64          // 剩余有效时间（秒）
+    IsExpired  bool           // 是否已过期
+    Raw        map[string]any // 原始响应数据
+}
+```

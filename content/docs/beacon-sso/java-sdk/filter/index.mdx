@@ -1,0 +1,42 @@
+---
+title: Filter 过滤器
+description: Servlet 过滤器概览
+icon: Shield
+---
+
+# Filter 过滤器
+
+SDK 提供 Servlet 过滤器，用于在请求处理前进行 Token 认证与注入。
+
+## 可用过滤器
+
+| 过滤器 | 说明 |
+|--------|------|
+| [BeaconSsoFilter](./auth-filter) | Token 认证与注入 |
+
+## 工作原理
+
+`BeaconSsoFilter` 继承 Spring 的 `OncePerRequestFilter`，确保在每个 HTTP 请求中只执行一次。通过 Spring Boot 自动配置机制自动注册，拦截所有请求（排除 `beacon.sso.exclude-urls` 配置的路径），从请求头中提取 Bearer Token 并调用 SSO Server 进行 Token 自省验证。
+
+验证通过后，将认证信息存入 `HttpServletRequest` 的 Attribute 中，供后续 Controller 和 AOP 切面使用。
+
+## 使用方式
+
+<Callout type="info">
+`BeaconSsoFilter` 由 Spring Boot 自动配置注册，无需手动注册。你只需引入 Starter 依赖并完成基础配置即可。
+</Callout>
+
+通过 `beacon.sso.exclude-urls` 排除不需要认证的路径：
+
+```yaml
+beacon:
+  sso:
+    exclude-urls:
+      - /api/public/**
+      - /actuator/**
+      - /health
+```
+
+## 下一步
+
+- [认证过滤器](./auth-filter) - 了解 `BeaconSsoFilter` 的详细工作流程与配置

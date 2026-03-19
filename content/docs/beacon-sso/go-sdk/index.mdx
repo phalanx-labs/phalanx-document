@@ -1,0 +1,36 @@
+---
+title: Go SDK
+description: Beacon SSO SDK Go 版本文档
+icon: FileCode
+---
+
+# Go SDK
+
+面向 Gin 项目的轻量级 OAuth2/SSO SDK，提供统一登录、用户管理和商户服务能力。
+
+## 核心特性
+
+- **OAuth2 授权码流程** - 完整的 State + PKCE 防护机制
+- **Token 缓存管理** - 基于 Redis 的 Token 自动缓存与刷新
+- **gRPC 服务客户端** - 四大服务（Public / Auth / User / Merchant）
+- **认证中间件** - 开箱即用的 Token 验证中间件
+- **灵活的依赖注入** - 与 bamboo-base-go 框架无缝集成
+
+## 子系统概览
+
+| 子系统 | 说明 | 协议 |
+|--------|------|------|
+| [OAuth2](./oauth2) | 登录/回调/登出流程 | HTTP REST + Redis |
+| [gRPC](./grpc) | 用户/认证/商户服务 | Connect-RPC |
+
+## 版本信息
+
+- 当前版本: v1.0.0
+- Go 版本: 1.25.3+
+- 依赖框架: bamboo-base-go
+
+## 快速开始
+
+<Callout type="info">
+5 分钟快速集成，请参考 [快速开始](./quick-start)。
+</Callout>

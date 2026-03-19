@@ -1,0 +1,5 @@
+{
+  "title": "gRPC 服务",
+  "icon": "Network",
+  "pages": ["index", "auth-service", "user-service", "public-service", "merchant-service"]
+}

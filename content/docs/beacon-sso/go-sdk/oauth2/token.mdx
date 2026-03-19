@@ -1,0 +1,190 @@
+---
+title: Token 管理
+description: Token 缓存、刷新和注销
+icon: Key
+---
+
+# Token 管理
+
+本文档介绍 Token 的缓存机制、刷新策略和注销流程。
+
+## Token 结构
+
+SDK 使用 `CacheOAuthToken` 模型存储 Token 信息：
+
+```go
+type CacheOAuthToken struct {
+    AccessToken  string // 访问令牌
+    TokenType    string // 令牌类型（通常为 "Bearer"）
+    RefreshToken string // 刷新令牌
+    Expiry       string // 过期时间（RFC3339 格式）
+}
+```
+
+## 缓存策略
+
+| 缓存类型 | Redis Key 模板 | TTL |
+|----------|---------------|-----|
+| OAuth Token | `oauth:token:{accessToken}` | 30 天 |
+
+### 缓存时机
+
+Token 在以下情况下会被缓存：
+
+1. **Exchange 成功后** - 授权码换取 Token 时自动缓存
+2. **TokenSource 刷新后** - 刷新 Token 时更新缓存
+3. **PasswordLogin 成功后** - 密码登录时自动缓存
+
+## Token 刷新
+
+### TokenSource 方法
+
+```go
+func (l *OAuthLogic) TokenSource(
+    ctx context.Context,
+    cacheToken *bSdkModels.CacheOAuthToken,
+    rt string,
+) (*oauth2.Token, *xError.Error)
+```
+
+使用 Refresh Token 获取新的 Access Token。
+
+**安全检查：**
+- 验证传入的 RT 与缓存中的 RT 是否一致
+- 不一致时清理缓存并返回错误
+
+**使用示例：**
+
+```go
+oauthLogic := bSdkLogic.NewOAuth(ctx)
+
+// 从缓存获取 Token
+cacheToken, err := oauthLogic.GetToken(ctx, accessToken)
+if err != nil {
+    // Token 不存在
+    return
+}
+
+// 刷新 Token
+newToken, err := oauthLogic.TokenSource(ctx, cacheToken, refreshToken)
+if err != nil {
+    // 刷新失败
+    return
+}
+```
+
+### 自动刷新
+
+SDK 在路由层提供了 `/api/account/token/refresh` 接口，可以直接调用：
+
+```bash
+POST /api/account/token/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "your-refresh-token"
+}
+```
+
+## Token 获取
+
+### GetToken 方法
+
+```go
+func (l *OAuthLogic) GetToken(ctx context.Context, accessToken string) (*bSdkModels.CacheOAuthToken, *xError.Error)
+```
+
+从 Redis 缓存中获取 Token 信息。
+
+**用途：** 中间件验证用户身份时使用
+
+## Token 过期验证
+
+### VerifyExpiry 方法
+
+```go
+func (l *OAuthLogic) VerifyExpiry(ctx context.Context, accessToken string) (bool, *xError.Error)
+```
+
+检查 Token 是否已过期。
+
+**返回值：**
+- `true` - Token 已过期
+- `false` - Token 未过期
+
+**使用示例：**
+
+```go
+oauthLogic := bSdkLogic.NewOAuth(ctx)
+
+isExpired, err := oauthLogic.VerifyExpiry(ctx, accessToken)
+if err != nil {
+    // 获取 Token 失败
+    return
+}
+
+if isExpired {
+    // Token 已过期，需要刷新
+}
+```
+
+## Token 注销
+
+### Logout 方法
+
+```go
+func (l *OAuthLogic) Logout(ctx context.Context, tokenType string, token string) *xError.Error
+```
+
+调用 OAuth2 Revocation Endpoint 注销 Token（符合 RFC 7009 规范）。
+
+**参数：**
+- `tokenType` - 令牌类型提示（`access_token` 或 `refresh_token`）
+- `token` - 待注销的令牌值
+
+**流程：**
+1. 向 Revocation Endpoint 发送注销请求
+2. 尝试清理本地 Redis 缓存
+3. 缓存清理失败仅记录警告，不阻断流程
+
+**使用示例：**
+
+```go
+oauthLogic := bSdkLogic.NewOAuth(ctx)
+
+// 注销 Access Token
+err := oauthLogic.Logout(ctx, "access_token", accessToken)
+if err != nil {
+    // 注销失败
+}
+
+// 注销 Refresh Token
+err = oauthLogic.Logout(ctx, "refresh_token", refreshToken)
+```
+
+## HTTP 路由
+
+SDK 提供以下 Token 相关路由：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/oauth/logout` | 注销 Token（从 Header 获取） |
+| POST | `/api/account/token/refresh` | 刷新令牌 |
+| POST | `/api/account/token/revoke` | 注销令牌（需认证） |
+
+### 注销请求示例
+
+```bash
+# 从 Header 获取 Token 注销
+POST /api/oauth/logout
+Authorization: Bearer your-access-token
+
+# 或者指定 Token 类型
+POST /api/account/token/revoke
+Authorization: Bearer your-access-token
+Content-Type: application/json
+
+{
+  "token_type_hint": "access_token"
+}
+```

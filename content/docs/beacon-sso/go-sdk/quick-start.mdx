@@ -1,0 +1,151 @@
+---
+title: 快速开始
+description: 5 分钟快速集成 Beacon SSO SDK
+icon: Rocket
+---
+
+# 快速开始
+
+本指南将帮助你在 5 分钟内完成 Beacon SSO SDK 的集成。
+
+## 安装
+
+```bash
+go get github.com/phalanx-labs/beacon-sso-sdk
+```
+
+## 完整示例
+
+以下是一个完整的 Gin 服务示例，集成了 OAuth2 登录和 gRPC 服务：
+
+```go
+package main
+
+import (
+	"context"
+
+	xConsts "github.com/bamboo-services/bamboo-base-go/defined/context"
+	xReg "github.com/bamboo-services/bamboo-base-go/major/register"
+	xRegNode "github.com/bamboo-services/bamboo-base-go/major/register/node"
+	xResult "github.com/bamboo-services/bamboo-base-go/major/result"
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+	bSdkRoute "github.com/phalanx-labs/beacon-sso-sdk/route"
+	bSdkStartup "github.com/phalanx-labs/beacon-sso-sdk/startup"
+	"gorm.io/gorm"
+)
+
+func main() {
+	// 1) 初始化注册节点（数据库、Redis + SDK 配置）
+	nodes := []xRegNode.RegNodeList{
+		{Key: xConsts.DatabaseKey, Node: initDatabase},
+		{Key: xConsts.RedisClientKey, Node: initRedis},
+	}
+	nodes = append(nodes, bSdkStartup.NewStartupConfig()...)
+
+	reg := xReg.Register(context.Background(), nodes)
+
+	// 2) 注册业务路由
+	reg.Serve.GET("/api/status", func(c *gin.Context) {
+		xResult.SuccessHasData(c, "服务正常", gin.H{
+			"status": "running",
+		})
+	})
+
+	// 3) 挂载 SDK 路由
+	sdkRoute := bSdkRoute.NewRoute(reg.Init.Ctx)
+
+	// OAuth2 路由（登录/回调/登出）
+	sdkRoute.OAuthRouter(reg.Serve.Group("/api"))
+
+	// 账户路由（注册/密码登录/刷新令牌）
+	sdkRoute.AccountRouter(reg.Serve.Group("/api"))
+
+	// 用户路由（获取用户信息）
+	sdkRoute.UserRouter(reg.Serve.Group("/api"))
+
+	// 4) 启动服务
+	_ = reg.Serve.Run(":8080")
+}
+
+// 数据库初始化节点
+func initDatabase(ctx context.Context) (any, error) {
+	// TODO: 替换为你的数据库初始化逻辑
+	var db *gorm.DB
+	return db, nil
+}
+
+// Redis 初始化节点
+func initRedis(ctx context.Context) (any, error) {
+	// TODO: 替换为你的 Redis 初始化逻辑
+	var rdb *redis.Client
+	return rdb, nil
+}
+```
+
+## 默认路由
+
+SDK 会自动注册以下路由：
+
+### OAuth2 路由
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/oauth/login` | 302 重定向到 SSO 授权页面 |
+| GET | `/api/oauth/callback` | OAuth2 回调，用 code 换 token |
+| POST | `/api/oauth/logout` | 注销 token |
+
+### 账户路由
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/account/register/email` | 邮箱注册 |
+| POST | `/api/account/login/password` | 密码登录 |
+| POST | `/api/account/token/refresh` | 刷新令牌 |
+| POST | `/api/account/password/change` | 修改密码 |
+| POST | `/api/account/token/revoke` | 注销令牌 |
+
+### 用户路由
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/user/userinfo` | 获取当前用户信息 |
+| GET | `/api/user/by-id` | 根据 ID 获取用户信息 |
+
+## 环境变量配置
+
+在运行前，请确保配置以下环境变量：
+
+```bash
+# 必填 - OAuth2 配置
+SSO_CLIENT_ID=your-client-id
+SSO_CLIENT_SECRET=your-client-secret
+SSO_REDIRECT_URI=http://localhost:8080/api/oauth/callback
+SSO_ENDPOINT_AUTH_URI=https://sso.example.com/oauth/authorize
+SSO_ENDPOINT_TOKEN_URI=https://sso.example.com/oauth/token
+SSO_ENDPOINT_USERINFO_URI=https://sso.example.com/oauth/userinfo
+SSO_ENDPOINT_INTROSPECTION_URI=https://sso.example.com/oauth/introspect
+SSO_ENDPOINT_REVOCATION_URI=https://sso.example.com/oauth/revoke
+
+# 必填 - gRPC 配置
+SSO_GRPC_HOST=sso.example.com
+SSO_GRPC_PORT=5566
+```
+
+<Callout type="info">
+完整的环境变量说明请参考 [环境变量配置](./environment)。
+</Callout>
+
+## 验证安装
+
+启动服务后，访问以下地址测试：
+
+1. **登录跳转**: `GET http://localhost:8080/api/oauth/login`
+2. **服务状态**: `GET http://localhost:8080/api/status`
+
+## 下一步
+
+- [环境变量配置](./environment) - 了解所有可配置项
+- [架构设计](./architecture) - 理解 SDK 的整体架构
+- [OAuth2 子系统](./oauth2) - 深入了解授权流程
+- [gRPC 服务](./grpc) - 使用 gRPC 客户端

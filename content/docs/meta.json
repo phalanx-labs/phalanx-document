@@ -1,0 +1,10 @@
+{
+  "title": "Phalanx",
+  "description": "Phalanx 项目文档",
+  "icon": "Library",
+  "pages": [
+    "guide",
+    "---Beacon SSO---",
+    "beacon-sso"
+  ]
+}

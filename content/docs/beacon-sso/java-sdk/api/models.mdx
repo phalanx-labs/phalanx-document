@@ -1,0 +1,225 @@
+---
+title: 数据模型
+description: SDK 数据模型参考
+icon: Database
+---
+
+# 数据模型
+
+本页面列出 SDK 中所有核心数据模型。
+
+## OAuth 模型
+
+### OAuthState
+
+OAuth2 State 和 PKCE Verifier 的缓存实体。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `state` | String | 随机状态码 |
+| `codeVerifier` | String | PKCE Code Verifier |
+| `redirectUri` | String | 回调地址 |
+| `createdAt` | Instant | 创建时间 |
+| `expiresAt` | Instant | 过期时间 |
+
+**方法：** `isExpired()` — 判断是否已过期。
+
+---
+
+### TokenResult
+
+OAuth2 Token 端点响应模型。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `accessToken` | String | 访问令牌 |
+| `tokenType` | String | 令牌类型（Bearer） |
+| `expiresIn` | Long | 过期时间（秒） |
+| `refreshToken` | String | 刷新令牌 |
+| `scope` | String | 权限范围 |
+| `createdAt` | Instant | 创建时间 |
+
+---
+
+### AuthorizationUrlResult
+
+授权 URL 构建结果。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `url` | String | 完整的授权 URL |
+| `state` | String | State 参数 |
+| `codeChallenge` | String | PKCE Code Challenge |
+| `codeVerifier` | String | PKCE Code Verifier |
+
+---
+
+## 用户模型
+
+### UserinfoResult
+
+OAuth2 Userinfo Endpoint 的响应模型。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `sub` | String | 用户唯一标识 |
+| `name` | String | 用户名称 |
+| `email` | String | 邮箱 |
+| `emailVerified` | Boolean | 邮箱是否已验证 |
+| `picture` | String | 头像 URL |
+
+---
+
+### UserDetailResult
+
+用户详细信息模型（gRPC）。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | String | 用户 ID |
+| `username` | String | 用户名 |
+| `nickname` | String | 昵称 |
+| `email` | String | 邮箱 |
+| `emailVerified` | Boolean | 邮箱是否已验证 |
+| `avatar` | String | 头像 URL |
+| `phone` | String | 手机号 |
+| `phoneVerified` | Boolean | 手机号是否已验证 |
+| `gender` | String | 性别 |
+| `birthday` | String | 生日 |
+| `status` | String | 账号状态 |
+| `needResetPassword` | Boolean | 是否需要重置密码 |
+| `lastLoginAt` | String | 最后登录时间 |
+| `lastLoginIp` | String | 最后登录 IP |
+| `roles` | List\<RoleResult\> | 角色列表 |
+
+---
+
+### RoleResult
+
+用户角色模型。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `code` | String | 角色编码 |
+| `name` | String | 角色名称 |
+| `description` | String | 角色描述 |
+
+---
+
+## Introspection 模型
+
+### IntrospectResult
+
+OAuth2 Token Introspection 的响应模型。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `active` | Boolean | 令牌是否有效 |
+| `scope` | String | 权限范围 |
+| `clientId` | String | 客户端 ID |
+| `username` | String | 用户名 |
+| `tokenType` | String | 令牌类型 |
+| `exp` | Long | 过期时间（Unix 时间戳） |
+| `iat` | Long | 签发时间（Unix 时间戳） |
+| `nbf` | Long | 生效时间（Unix 时间戳） |
+| `sub` | String | 用户唯一标识 |
+| `aud` | String | 受众 |
+| `iss` | String | 签发者 |
+| `jti` | String | 令牌 ID |
+
+---
+
+### ValidateResult
+
+Token 验证结果模型。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `valid` | Boolean | 是否有效 |
+| `message` | String | 验证结果消息 |
+
+---
+
+## Account 模型
+
+### LoginResult
+
+登录结果模型。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `accessToken` | String | 访问令牌 |
+| `tokenType` | String | 令牌类型 |
+| `expiresIn` | Long | 过期时间（秒） |
+| `refreshToken` | String | 刷新令牌 |
+| `scope` | String | 权限范围 |
+| `idToken` | String | ID Token |
+
+---
+
+### RegisterResult
+
+注册结果模型。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `userId` | String | 用户 ID |
+| `token` | TokenResult | Token 信息 |
+
+---
+
+## Merchant 模型
+
+### MerchantTagResult
+
+商户标签模型。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | String | 标签 ID |
+| `code` | String | 标签编码 |
+| `name` | String | 标签名称 |
+| `description` | String | 标签描述 |
+| `color` | String | 标签颜色 |
+| `icon` | String | 标签图标 |
+| `sortOrder` | Integer | 排序顺序 |
+| `status` | String | 标签状态 |
+
+---
+
+### AnnouncementResult
+
+公告模型。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | String | 公告 ID |
+| `title` | String | 公告标题 |
+| `content` | String | 公告内容 |
+| `scope` | String | 公告范围 |
+| `displayUntil` | String | 展示截止时间 |
+| `createdAt` | String | 创建时间 |
+
+---
+
+### RecentAnnouncementsResult
+
+最近公告列表模型。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `announcements` | List\<AnnouncementResult\> | 公告列表 |
+| `meta` | AnnouncementListMetaResult | 列表元信息 |
+
+---
+
+### AnnouncementListMetaResult
+
+公告列表元信息模型。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `md5Hash` | String | 内容 MD5 哈希 |
+| `sha256Hash` | String | 内容 SHA256 哈希 |
+| `count` | Integer | 公告数量 |
+| `generatedAt` | String | 生成时间 |

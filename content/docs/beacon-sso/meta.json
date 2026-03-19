@@ -1,0 +1,12 @@
+{
+  "title": "Beacon SSO SDK",
+  "icon": "Key",
+  "description": "面向 Gin 框架的轻量级 OAuth2/SSO SDK",
+  "pages": [
+    "index",
+    "---Go SDK---",
+    "go-sdk",
+    "---Java SDK---",
+    "java-sdk"
+  ]
+}

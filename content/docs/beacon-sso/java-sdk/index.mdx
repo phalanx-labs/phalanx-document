@@ -1,0 +1,37 @@
+---
+title: Java SDK
+description: Beacon SSO SDK Java 版本文档
+icon: Coffee
+---
+
+# Java SDK
+
+基于 Spring Boot 3 的轻量级 OAuth2/SSO SDK，提供统一登录、用户管理和商户服务能力。
+
+## 核心特性
+
+- **OAuth2 授权码流程** - 完整的 State + PKCE (S256) 防护机制
+- **Spring Boot 自动配置** - 引入 Starter 即可，零配置启动
+- **双传输架构** - HTTP（默认）+ 可选 gRPC 服务
+- **Filter + AOP 认证** - `BeaconSsoFilter` 过滤器 + `@InjectData` / `@PermissionVerify` 注解
+- **Caffeine 缓存** - 基于 Caffeine 的高性能内存缓存
+
+## 子系统概览
+
+| 子系统 | 说明 | 协议 |
+|--------|------|------|
+| [OAuth2](./oauth2) | 登录/回调/登出流程 | HTTP REST + Caffeine |
+| [gRPC](./grpc) | 用户/认证/商户服务 | gRPC（可选） |
+
+## 版本信息
+
+- 当前版本: 0.0.1-SNAPSHOT
+- Java 版本: 17+
+- Spring Boot: 3.5.11
+- Maven 坐标: `com.frontleaves.phalanx.beacon.sso:bamboo-sso-sdk-springboot`
+
+## 快速开始
+
+<Callout type="info">
+5 分钟快速集成，请参考 [快速开始](./quick-start)。
+</Callout>

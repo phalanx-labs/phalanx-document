@@ -1,0 +1,5 @@
+{
+  "title": "OAuth2 子系统",
+  "icon": "Lock",
+  "pages": ["index", "flow", "token", "routes"]
+}

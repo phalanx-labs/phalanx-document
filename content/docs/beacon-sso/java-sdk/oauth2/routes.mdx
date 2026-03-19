@@ -1,0 +1,173 @@
+---
+title: 默认路由
+description: SDK 自动注册的 OAuth2 与账户路由
+icon: Route
+---
+
+# 默认路由
+
+SDK 通过 Spring Boot 自动配置机制自动注册 REST Controller，开箱即用，无需手动挂载路由。
+
+## OAuth 路由
+
+前缀由 `beacon.sso.oauth-path` 配置，默认为 `/oauth`：
+
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/oauth/login` | 无 | 302 重定向到 SSO 授权页面 |
+| GET | `/oauth/callback` | 无 | OAuth2 回调，验证 State + 交换 Token |
+| GET | `/oauth/logout` | 无 | 撤销 Token + 清除 HTTP Session |
+| GET | `/oauth/status` | 无 | 获取当前认证状态 |
+
+## 账户路由
+
+前缀由 `beacon.sso.account-path` 配置，默认为 `/account`。**账户路由依赖 gRPC 服务**，需额外配置 `beacon.sso.grpc.enabled=true`：
+
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| POST | `/account/register/email` | 无 | 邮箱注册 |
+| POST | `/account/login/password` | 无 | 密码登录 |
+| POST | `/account/password/change` | 需认证 | 修改密码 |
+| POST | `/account/logout` | 需认证 | 撤销 Token |
+
+<Callout type="warn">
+账户路由依赖 gRPC 服务，需在 `application.yml` 中配置 `beacon.sso.grpc.enabled=true` 及相关连接参数（host、port、app-access-id、app-secret-key）。
+</Callout>
+
+## 可配置路径前缀
+
+SDK 自动注册的所有 Controller 路径前缀均可通过配置自定义：
+
+| 配置项 | 默认值 | 影响路由 |
+|--------|--------|----------|
+| `beacon.sso.oauth-path` | `/oauth` | 登录/回调/登出/状态 |
+| `beacon.sso.account-path` | `/account` | 注册/登录/改密/登出 |
+
+### 配置示例
+
+将 OAuth 路由前缀改为 `/sso`，账户路由前缀改为 `/auth`：
+
+```yaml
+beacon:
+  sso:
+    oauth-path: /sso
+    account-path: /auth
+```
+
+### 生成的路由
+
+| 原路径 | 新路径 |
+|--------|--------|
+| `/oauth/login` | `/sso/login` |
+| `/oauth/callback` | `/sso/callback` |
+| `/oauth/logout` | `/sso/logout` |
+| `/oauth/status` | `/sso/status` |
+| `/account/register/email` | `/auth/register/email` |
+| `/account/login/password` | `/auth/login/password` |
+| `/account/password/change` | `/auth/password/change` |
+| `/account/logout` | `/auth/logout` |
+
+## 路由详情
+
+### GET /oauth/login
+
+发起 OAuth2 登录流程，重定向到 SSO 授权页面。
+
+**请求示例：**
+
+```bash
+GET /oauth/login HTTP/1.1
+```
+
+**响应：**
+
+```
+HTTP/1.1 302 Found
+Location: https://sso.example.com/oauth/authorize?client_id=xxx&redirect_uri=xxx&response_type=code&state=xxx&code_challenge=xxx&code_challenge_method=S256
+```
+
+### GET /oauth/callback
+
+OAuth2 回调端点，处理 SSO Server 的授权响应。
+
+**请求参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `code` | string | 授权码 |
+| `state` | string | 状态码（用于验证） |
+
+**请求示例：**
+
+```bash
+GET /oauth/callback?code=abc123&state=XYZ789 HTTP/1.1
+```
+
+**成功响应：**
+
+SDK 将 Token 存入 HTTP Session 并重定向到应用首页（默认 `/`）：
+
+```
+HTTP/1.1 302 Found
+Location: /
+```
+
+**错误响应：**
+
+| 错误码 | 说明 |
+|--------|------|
+| 401 | State 验证失败或授权码换取失败 |
+
+### GET /oauth/logout
+
+注销当前用户，撤销 Token 并清除 Session。
+
+**请求示例：**
+
+```bash
+GET /oauth/logout HTTP/1.1
+```
+
+**成功响应：**
+
+```
+HTTP/1.1 302 Found
+Location: /
+```
+
+### GET /oauth/status
+
+获取当前用户的认证状态，从 HTTP Session 中读取 Token 信息。
+
+**请求示例：**
+
+```bash
+GET /oauth/status HTTP/1.1
+```
+
+**已认证响应：**
+
+```json
+{
+  "code": 200,
+  "message": "已认证",
+  "data": {
+    "authenticated": true,
+    "accessToken": "eyJhbGciOiJSUzI1NiIs...",
+    "tokenType": "Bearer",
+    "expiresIn": 3600
+  }
+}
+```
+
+**未认证响应：**
+
+```json
+{
+  "code": 200,
+  "message": "未认证",
+  "data": {
+    "authenticated": false
+  }
+}
+```

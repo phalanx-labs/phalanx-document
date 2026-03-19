@@ -1,0 +1,172 @@
+---
+title: 默认路由
+description: OAuth2 默认路由说明
+icon: Route
+---
+
+# 默认路由
+
+SDK 提供开箱即用的 OAuth2 路由，可通过 `OAuthRouter` 快速挂载。
+
+## 路由列表
+
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/oauth/login` | 无 | 302 重定向到 SSO 授权页面 |
+| GET | `/oauth/callback` | 无 | OAuth2 回调，用 code 换 token |
+| POST | `/oauth/logout` | 无 | 注销 token（通过 Header 传 token） |
+
+## 挂载路由
+
+```go
+import bSdkRoute "github.com/phalanx-labs/beacon-sso-sdk/route"
+
+// 挂载到 /api 前缀
+sdkRoute := bSdkRoute.NewRoute(ctx)
+sdkRoute.OAuthRouter(reg.Serve.Group("/api"))
+
+// 或挂载到根路径
+sdkRoute.OAuthRouter(reg.Serve.Group(""))
+```
+
+## 路由详情
+
+### GET /oauth/login
+
+发起 OAuth2 登录流程，重定向到 SSO 授权页面。
+
+**请求示例：**
+
+```bash
+GET /api/oauth/login HTTP/1.1
+```
+
+**响应：**
+
+```
+HTTP/1.1 302 Found
+Location: https://sso.example.com/oauth/authorize?client_id=xxx&redirect_uri=xxx&response_type=code&state=xxx&code_challenge=xxx&code_challenge_method=S256
+```
+
+### GET /oauth/callback
+
+OAuth2 回调端点，处理 SSO Server 的授权响应。
+
+**请求参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `code` | string | 授权码 |
+| `state` | string | 状态码（用于验证） |
+
+**请求示例：**
+
+```bash
+GET /api/oauth/callback?code=abc123&state=XYZ789 HTTP/1.1
+```
+
+**成功响应：**
+
+```json
+{
+  "code": 200,
+  "message": "登录成功",
+  "data": {
+    "access_token": "eyJhbGciOiJSUzI1NiIs...",
+    "token_type": "Bearer",
+    "refresh_token": "dGhpcyBpcyBhIHJlZnJlc2g...",
+    "expires_in": 3600
+  }
+}
+```
+
+**错误响应：**
+
+| 错误码 | 说明 |
+|--------|------|
+| 401 | 未登录（State 验证失败或 Code 换取失败） |
+
+### POST /oauth/logout
+
+注销当前用户的 Token。
+
+**请求头：**
+
+| Header | 说明 |
+|--------|------|
+| `Authorization` | Bearer {accessToken} |
+
+**请求示例：**
+
+```bash
+POST /api/oauth/logout HTTP/1.1
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+```
+
+**成功响应：**
+
+```json
+{
+  "code": 200,
+  "message": "注销成功"
+}
+```
+
+## 自定义路由前缀
+
+你可以自由选择路由前缀：
+
+```go
+// 方式 1：挂载到 /api
+sdkRoute.OAuthRouter(reg.Serve.Group("/api"))
+// 路由: /api/oauth/login, /api/oauth/callback, /api/oauth/logout
+
+// 方式 2：挂载到 /auth
+sdkRoute.OAuthRouter(reg.Serve.Group("/auth"))
+// 路由: /auth/oauth/login, /auth/oauth/callback, /auth/oauth/logout
+
+// 方式 3：挂载到根路径
+sdkRoute.OAuthRouter(reg.Serve.Group(""))
+// 路由: /oauth/login, /oauth/callback, /oauth/logout
+```
+
+## 完整路由挂载示例
+
+```go
+package main
+
+import (
+    "context"
+    xConsts "github.com/bamboo-services/bamboo-base-go/defined/context"
+    xReg "github.com/bamboo-services/bamboo-base-go/major/register"
+    xRegNode "github.com/bamboo-services/bamboo-base-go/major/register/node"
+    "github.com/gin-gonic/gin"
+    bSdkRoute "github.com/phalanx-labs/beacon-sso-sdk/route"
+    bSdkStartup "github.com/phalanx-labs/beacon-sso-sdk/startup"
+)
+
+func main() {
+    // 初始化
+    nodes := []xRegNode.RegNodeList{
+        {Key: xConsts.DatabaseKey, Node: initDatabase},
+        {Key: xConsts.RedisClientKey, Node: initRedis},
+    }
+    nodes = append(nodes, bSdkStartup.NewStartupConfig()...)
+    reg := xReg.Register(context.Background(), nodes)
+
+    // 挂载所有 SDK 路由
+    sdkRoute := bSdkRoute.NewRoute(reg.Init.Ctx)
+
+    // OAuth2 路由（登录/回调/登出）
+    sdkRoute.OAuthRouter(reg.Serve.Group("/api"))
+
+    // 账户路由（注册/登录/刷新）
+    sdkRoute.AccountRouter(reg.Serve.Group("/api"))
+
+    // 用户路由（获取用户信息）
+    sdkRoute.UserRouter(reg.Serve.Group("/api"))
+
+    // 启动服务
+    _ = reg.Serve.Run(":8080")
+}
+```

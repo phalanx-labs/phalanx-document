@@ -1,0 +1,142 @@
+---
+title: gRPC 服务
+description: gRPC 服务客户端概览
+icon: Network
+---
+
+# gRPC 服务
+
+gRPC 服务基于 Connect-RPC 协议实现，提供认证、用户和商户三大服务。
+
+## 协议说明
+
+SDK 使用 [Connect-RPC](https://connectrpc.com/) 协议，这是一种基于 HTTP/2 的 gRPC 兼容协议，具有以下特点：
+
+- 完全兼容 gRPC
+- 支持 HTTP/2 明文传输（h2c）
+- 自动生成类型安全的客户端代码
+
+## SsoClient 初始化
+
+### Option 模式
+
+SDK 使用 Option 模式初始化客户端：
+
+```go
+import bSdkClient "github.com/phalanx-labs/beacon-sso-sdk/client"
+
+client := bSdkClient.NewClient(
+    bSdkClient.WithConnect("sso.example.com", "5566"),
+    bSdkClient.WithAppAccess("your-app-id", "your-app-secret"),
+)
+```
+
+### 可用 Option
+
+| Option | 说明 |
+|--------|------|
+| `WithConnect(host, port)` | 设置 gRPC 主机地址和端口 |
+| `WithAppAccess(id, secret)` | 设置 App 认证凭证 |
+| `WithProtoPublicClient(client)` | 直接注入 Public 客户端（测试用） |
+| `WithProtoAuthClient(client)` | 直接注入 Auth 客户端（测试用） |
+| `WithProtoMerchantClient(client)` | 直接注入 Merchant 客户端（测试用） |
+| `WithProtoUserClient(client)` | 直接注入 User 客户端（测试用） |
+
+### 通过依赖注入获取
+
+如果你的项目已集成 SDK 的 Startup 节点，可以从上下文中获取：
+
+```go
+import bSdkUtil "github.com/phalanx-labs/beacon-sso-sdk/utility"
+
+client := bSdkUtil.GetSsoClient(ctx)
+```
+
+## 服务概览
+
+| 服务 | 说明 | 认证要求 |
+|------|------|----------|
+| [Public](./public-service) | 公共服务 | 无 |
+| [Auth](./auth-service) | 认证服务 | App 凭证 |
+| [User](./user-service) | 用户服务 | App 凭证 + User Token |
+| [Merchant](./merchant-service) | 商户服务 | App 凭证 |
+
+## 认证机制
+
+### App 凭证
+
+Auth、User、Merchant 服务需要在 gRPC metadata 中提供 App 凭证：
+
+```go
+// metadata 中会自动注入
+// app-access-id: your-app-id
+// app-secret-key: your-app-secret
+```
+
+### User Token
+
+User 服务还需要在 metadata 中提供用户 Token：
+
+```go
+// metadata 中会自动注入
+// authorization: Bearer {accessToken}
+```
+
+<Callout type="info">
+服务封装层会自动处理 metadata 注入，你只需在调用时传入 accessToken 参数。
+</Callout>
+
+## 使用示例
+
+```go
+import (
+    "context"
+    bSdkClient "github.com/phalanx-labs/beacon-sso-sdk/client"
+    pb "github.com/phalanx-labs/beacon-sso-sdk/client/api/beacon/sso/v1"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // 创建客户端
+    client := bSdkClient.NewClient(
+        bSdkClient.WithConnect("sso.example.com", "5566"),
+        bSdkClient.WithAppAccess("app-id", "app-secret"),
+    )
+
+    // 使用 Public 服务
+    _, err := client.Public.SendRegisterEmailCode(ctx, &pb.SendRegisterEmailCodeRequest{
+        Email: "user@example.com",
+    })
+
+    // 使用 Auth 服务
+    loginResp, err := client.Auth.PasswordLogin(ctx, &pb.PasswordLoginRequest{
+        Username: "user@example.com",
+        Password: "password123",
+        Scope:    "openid profile email",
+    })
+
+    // 使用 User 服务（需要 accessToken）
+    userResp, err := client.User.GetCurrentUser(ctx, loginResp.AccessToken)
+
+    // 使用 Merchant 服务
+    tagsResp, err := client.Merchant.GetMerchantTags(ctx, &service.GetMerchantTagsRequest{})
+}
+```
+
+## 子文档
+
+<CardGroup cols={2}>
+  <Card title="Public 服务" href="./public-service">
+    发送注册验证码等公共功能
+  </Card>
+  <Card title="Auth 服务" href="./auth-service">
+    注册、登录、修改密码、注销令牌
+  </Card>
+  <Card title="User 服务" href="./user-service">
+    获取用户信息
+  </Card>
+  <Card title="Merchant 服务" href="./merchant-service">
+    商户标签、公告管理
+  </Card>
+</CardGroup>

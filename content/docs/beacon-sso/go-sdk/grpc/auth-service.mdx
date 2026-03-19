@@ -1,0 +1,224 @@
+---
+title: Auth 服务
+description: 认证服务 API
+icon: ShieldCheck
+---
+
+# Auth 服务
+
+Auth 服务提供用户认证相关功能，包括注册、登录、修改密码和注销令牌。
+
+<Callout type="warn">
+Auth 服务需要在 metadata 中提供有效的 App 凭证（`app-access-id` 和 `app-secret-key`）。
+</Callout>
+
+## 接口概览
+
+| 方法 | 说明 | 返回 Token |
+|------|------|-----------|
+| `RegisterByEmail` | 邮箱注册 | ✓ |
+| `PasswordLogin` | 密码登录 | ✓ |
+| `ChangePassword` | 修改密码 | ✗ |
+| `RevokeToken` | 注销令牌 | ✗ |
+
+## RegisterByEmail
+
+通过邮箱验证码完成用户注册，注册成功后自动生成登录 Token。
+
+### 请求参数
+
+```go
+type RegisterByEmailRequest struct {
+    Email       string // 邮箱地址
+    Code        string // 验证码
+    Username    string // 用户名
+    Password    string // 密码
+    Nickname    string // 昵称（可选）
+}
+```
+
+### 响应
+
+```go
+type RegisterByEmailResponse struct {
+    UserId       string // 用户 ID
+    AccessToken  string // 访问令牌
+    RefreshToken string // 刷新令牌
+    ExpiresIn    int64  // 过期时间（秒）
+}
+```
+
+### 使用示例
+
+```go
+// 1. 先发送验证码
+_, err := client.Public.SendRegisterEmailCode(ctx, &pb.SendRegisterEmailCodeRequest{
+    Email: "user@example.com",
+})
+
+// 2. 用户输入验证码后注册
+resp, err := client.Auth.RegisterByEmail(ctx, &pb.RegisterByEmailRequest{
+    Email:    "user@example.com",
+    Code:     "123456",
+    Username: "newuser",
+    Password: "SecurePass123!",
+    Nickname: "New User",
+})
+
+fmt.Printf("注册成功！用户 ID: %s\n", resp.UserId)
+fmt.Printf("Access Token: %s\n", resp.AccessToken)
+```
+
+## PasswordLogin
+
+实现 OAuth 2.0 Resource Owner Password Credentials Grant，允许受信任的第一方客户端直接使用用户名和密码换取 Token。
+
+### 安全限制
+
+- **仅限第一方应用**（`App.FirstParty = enabled`）
+- 支持用户名/邮箱/手机号三种登录方式（自动识别）
+
+### 请求参数
+
+```go
+type PasswordLoginRequest struct {
+    Username string // 用户名/邮箱/手机号
+    Password string // 密码
+    Scope    string // 权限范围（如 "openid profile email"）
+}
+```
+
+### 响应
+
+```go
+type PasswordLoginResponse struct {
+    AccessToken  string // 访问令牌
+    TokenType    string // 令牌类型（通常为 "Bearer"）
+    RefreshToken string // 刷新令牌
+    ExpiresIn    int64  // 过期时间（秒）
+    IdToken      string // ID Token（可选）
+}
+```
+
+### 使用示例
+
+```go
+resp, err := client.Auth.PasswordLogin(ctx, &pb.PasswordLoginRequest{
+    Username: "user@example.com",
+    Password: "SecurePass123!",
+    Scope:    "openid profile email",
+})
+
+if err != nil {
+    panic(err)
+}
+
+fmt.Printf("登录成功！\n")
+fmt.Printf("Access Token: %s\n", resp.AccessToken)
+fmt.Printf("过期时间: %d 秒\n", resp.ExpiresIn)
+```
+
+<Callout type="info">
+密码登录会自动缓存 Token 到 Redis，可通过 `OAuthLogic.GetToken()` 获取。
+</Callout>
+
+## ChangePassword
+
+修改用户密码，支持普通模式和强制重置模式。
+
+### 模式说明
+
+| 模式 | 条件 | 旧密码 |
+|------|------|--------|
+| 普通模式 | `NeedResetPassword=false` | 必填 |
+| 强制重置模式 | `NeedResetPassword=true` | 可省略 |
+
+### 请求参数
+
+```go
+type ChangePasswordRequest struct {
+    UserId           string // 用户 ID
+    OldPassword      string // 旧密码（普通模式必填）
+    NewPassword      string // 新密码
+    NeedResetPassword bool  // 是否强制重置模式
+}
+```
+
+### 响应
+
+```go
+type ChangePasswordResponse struct {
+    // 基础响应信息
+}
+```
+
+### 使用示例
+
+```go
+// 普通模式修改密码
+_, err := client.Auth.ChangePassword(ctx, &pb.ChangePasswordRequest{
+    UserId:      "user-123",
+    OldPassword: "OldPass123!",
+    NewPassword: "NewSecurePass456!",
+})
+
+// 强制重置模式（管理员场景）
+_, err := client.Auth.ChangePassword(ctx, &pb.ChangePasswordRequest{
+    UserId:            "user-123",
+    NewPassword:       "NewSecurePass456!",
+    NeedResetPassword: true,
+})
+```
+
+## RevokeToken
+
+注销用户 Token，实现用户登出功能。符合 RFC 7009 OAuth 2.0 Token Revocation 规范。
+
+### 使用场景
+
+- 用户主动登出
+- Token 泄露后的紧急注销
+
+### 请求参数
+
+```go
+type RevokeTokenRequest struct {
+    TokenTypeHint string // 令牌类型提示（access_token/refresh_token，可选）
+}
+
+// 方法签名
+func (s *AuthService) RevokeToken(
+    ctx context.Context,
+    accessToken string,  // 用户访问令牌
+    req *pb.RevokeTokenRequest,
+) (*pb.RevokeTokenResponse, error)
+```
+
+### 使用示例
+
+```go
+// 注销 Access Token
+_, err := client.Auth.RevokeToken(ctx, accessToken, &pb.RevokeTokenRequest{
+    TokenTypeHint: "access_token",
+})
+
+// 注销 Refresh Token
+_, err := client.Auth.RevokeToken(ctx, refreshToken, &pb.RevokeTokenRequest{
+    TokenTypeHint: "refresh_token",
+})
+```
+
+<Callout type="info">
+SDK 的 HTTP 路由层调用 `RevokeToken` 后会自动清理本地 Redis 缓存。
+</Callout>
+
+## HTTP 路由
+
+SDK 提供以下 Auth 相关 HTTP 路由：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/account/register/email` | 邮箱注册 |
+| POST | `/api/account/login/password` | 密码登录 |
+| POST | `/api/account/password/change` | 修改密码（需认证） |
+| POST | `/api/account/token/revoke` | 注销令牌（需认证） |

@@ -1,0 +1,5 @@
+{
+  "title": "Filter 过滤器",
+  "icon": "Shield",
+  "pages": ["index", "auth-filter"]
+}

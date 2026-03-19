@@ -1,0 +1,98 @@
+---
+title: @InjectData
+description: 自动注入用户数据到 Controller 方法参数
+icon: ArrowDownToLine
+---
+
+# @InjectData
+
+`@InjectData` 注解用于自动将 `IntrospectResult` 中的字段注入到 Controller 方法参数中，简化获取用户信息的代码。
+
+## 功能说明
+
+通过 `@InjectData` 注解，你可以直接在 Controller 方法参数上声明需要的用户数据字段，SDK 会自动从 `BeaconSsoFilter` 存入的 `IntrospectResult` 中提取对应值并注入。
+
+## 支持的字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `sub` | String | 用户唯一标识 |
+| `username` | String | 用户名 |
+| `clientId` | String | 客户端 ID |
+| `scope` | String | 权限范围 |
+| `tokenType` | String | 令牌类型 |
+| `iss` | String | 签发者 |
+| `jti` | String | 令牌 ID |
+| `exp` | Long | 过期时间（Unix 时间戳） |
+| `iat` | Long | 签发时间（Unix 时间戳） |
+| `nbf` | Long | 生效时间（Unix 时间戳） |
+| `aud` | String | 受众 |
+| `active` | Boolean | 令牌是否有效 |
+
+### 类型转换
+
+SDK 支持以下类型自动转换：
+
+| 目标类型 | 转换规则 |
+|----------|----------|
+| `String` | 直接取值 |
+| `Boolean` | 字符串转布尔值 |
+| `Long` | 字符串转长整型（适用于时间戳字段） |
+| `List<String>` | 逗号分隔的字符串转为列表（适用于 scope 等字段） |
+
+### 注入整个 IntrospectResult
+
+如果不指定 `value()` 且参数类型为 `IntrospectResult`，SDK 会注入完整的自省结果对象。
+
+## 使用示例
+
+```java
+@RestController
+@RequestMapping("/api")
+public class DemoController {
+
+    // 注入单个字段
+    @GetMapping("/profile")
+    public BaseResponse<String> getProfile(@InjectData("sub") String userId) {
+        return BaseResponse.success("获取成功", userId);
+    }
+
+    // 注入完整对象
+    @GetMapping("/info")
+    public BaseResponse<IntrospectResult> getInfo(@InjectData IntrospectResult result) {
+        return BaseResponse.success("获取成功", result);
+    }
+
+    // 注入多个字段
+    @GetMapping("/detail")
+    public BaseResponse<Map<String, Object>> getDetail(
+            @InjectData("sub") String userId,
+            @InjectData("username") String username,
+            @InjectData("scope") List<String> scope) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", userId);
+        data.put("username", username);
+        data.put("scope", scope);
+        return BaseResponse.success("获取成功", data);
+    }
+}
+```
+
+## required 参数
+
+`@InjectData` 提供 `required` 参数（默认为 `true`），控制当字段值不存在时的行为：
+
+```java
+// 默认 required = true，字段不存在时抛出异常
+@GetMapping("/strict")
+public BaseResponse<String> strict(@InjectData("sub") String userId) {
+    return BaseResponse.success("获取成功", userId);
+}
+
+// required = false，字段不存在时注入 null
+@GetMapping("/optional")
+public BaseResponse<String> optional(
+        @InjectData(value = "nickname", required = false) String nickname) {
+    return BaseResponse.success("获取成功", nickname);
+}
+```

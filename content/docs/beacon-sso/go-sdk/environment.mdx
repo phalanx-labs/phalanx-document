@@ -1,0 +1,104 @@
+---
+title: 环境变量配置
+description: Beacon SSO SDK 环境变量配置说明
+icon: Settings
+---
+
+# 环境变量配置
+
+Beacon SSO SDK 通过环境变量进行配置，分为 **OAuth2 配置** 和 **gRPC 配置** 两部分。
+
+## OAuth2 配置
+
+### 必填环境变量
+
+| 变量名 | 说明 | 示例 |
+|--------|------|------|
+| `SSO_CLIENT_ID` | OAuth2 客户端 ID | `my-app-client` |
+| `SSO_CLIENT_SECRET` | OAuth2 客户端 Secret | `secret-key-xxx` |
+| `SSO_REDIRECT_URI` | OAuth2 回调地址 | `http://localhost:8080/api/oauth/callback` |
+| `SSO_ENDPOINT_AUTH_URI` | 授权端点 | `https://sso.example.com/oauth/authorize` |
+| `SSO_ENDPOINT_TOKEN_URI` | 令牌端点 | `https://sso.example.com/oauth/token` |
+| `SSO_ENDPOINT_USERINFO_URI` | 用户信息端点 | `https://sso.example.com/oauth/userinfo` |
+| `SSO_ENDPOINT_INTROSPECTION_URI` | 令牌自省端点 | `https://sso.example.com/oauth/introspect` |
+| `SSO_ENDPOINT_REVOCATION_URI` | 令牌注销端点 | `https://sso.example.com/oauth/revoke` |
+
+### 可选环境变量
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| `SSO_WELL_KNOWN_URI` | 自动发现端点 | 空（需手动配置各端点） |
+| `SSO_BUSINESS_CACHE` | 业务缓存开关 | `false` |
+
+## gRPC 配置
+
+### 必填环境变量
+
+| 变量名 | 说明 | 示例 |
+|--------|------|------|
+| `SSO_GRPC_HOST` | gRPC 主机地址 | `sso.example.com` |
+| `SSO_GRPC_PORT` | gRPC 端口 | `5566` |
+
+## Well-Known 自动发现
+
+如果你配置了 `SSO_WELL_KNOWN_URI`，SDK 会自动从该端点获取以下配置：
+
+- `authorization_endpoint`
+- `token_endpoint`
+- `userinfo_endpoint`
+- `introspection_endpoint`
+- `revocation_endpoint`
+
+<Callout type="info">
+配置 `SSO_WELL_KNOWN_URI` 后，可以省略所有 `SSO_ENDPOINT_*` 环境变量。
+</Callout>
+
+## 配置示例
+
+### .env 文件
+
+```bash
+# OAuth2 配置
+SSO_CLIENT_ID=my-app-client
+SSO_CLIENT_SECRET=secret-key-xxx
+SSO_REDIRECT_URI=http://localhost:8080/api/oauth/callback
+SSO_ENDPOINT_AUTH_URI=https://sso.example.com/oauth/authorize
+SSO_ENDPOINT_TOKEN_URI=https://sso.example.com/oauth/token
+SSO_ENDPOINT_USERINFO_URI=https://sso.example.com/oauth/userinfo
+SSO_ENDPOINT_INTROSPECTION_URI=https://sso.example.com/oauth/introspect
+SSO_ENDPOINT_REVOCATION_URI=https://sso.example.com/oauth/revoke
+
+# gRPC 配置
+SSO_GRPC_HOST=sso.example.com
+SSO_GRPC_PORT=5566
+
+# 可选配置
+SSO_BUSINESS_CACHE=true
+```
+
+### 使用 Well-Known 自动发现
+
+```bash
+# 使用自动发现时，只需配置以下变量
+SSO_CLIENT_ID=my-app-client
+SSO_CLIENT_SECRET=secret-key-xxx
+SSO_REDIRECT_URI=http://localhost:8080/api/oauth/callback
+SSO_WELL_KNOWN_URI=https://sso.example.com/.well-known/openid-configuration
+
+# gRPC 配置仍需手动填写
+SSO_GRPC_HOST=sso.example.com
+SSO_GRPC_PORT=5566
+```
+
+## 业务缓存说明
+
+`SSO_BUSINESS_CACHE` 控制以下业务逻辑的 Redis 缓存：
+
+| 功能 | 缓存键模板 | TTL |
+|------|-----------|-----|
+| Userinfo | `oauth:biz:userinfo:{accessToken}` | 30 秒 |
+| Introspection | `oauth:biz:introspection:{tokenType}:{token}` | 动态（取 min(expiresIn, 30s)） |
+
+<Callout type="warn">
+开启业务缓存后，用户信息变更可能会有最多 30 秒的延迟。
+</Callout>

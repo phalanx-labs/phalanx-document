@@ -1,0 +1,66 @@
+---
+title: 高级话题
+description: 进阶使用技巧
+icon: Settings
+---
+
+# 高级话题
+
+本章节介绍 SDK 的高级配置和使用技巧。
+
+## 子文档
+
+<CardGroup cols={1}>
+  <Card title="缓存策略" href="./cache">
+    了解 SDK 的 Caffeine 内存缓存机制和配置选项
+  </Card>
+</CardGroup>
+
+## 直接使用 SsoApi
+
+除了通过 Filter 和 AOP 的方式使用 SDK 外，你还可以直接注入 `SsoApi` Bean 进行编程式调用：
+
+```java
+@RestController
+@RequestMapping("/api")
+public class DemoController {
+
+    private final SsoApi ssoApi;
+
+    public DemoController(SsoApi ssoApi) {
+        this.ssoApi = ssoApi;
+    }
+
+    @GetMapping("/userinfo")
+    public BaseResponse<UserinfoResult> getUserinfo(HttpServletRequest request) {
+        String token = SsoSecurityUtil.getCurrentToken(request).orElse(null);
+        UserinfoResult result = ssoApi.user().getCurrentUser(token);
+        return BaseResponse.success("获取成功", result);
+    }
+}
+```
+
+## 传输模式
+
+### HTTP-only 模式（默认）
+
+SDK 默认仅使用 HTTP 传输，适用于只需要 OAuth2 登录流程和 Token 自省的场景。无需额外配置 gRPC 参数。
+
+### gRPC 模式
+
+启用 gRPC 后，SDK 会同时使用 HTTP（OAuth2 流程）和 gRPC（用户、认证、商户服务）两种传输方式：
+
+```yaml
+beacon:
+  sso:
+    grpc:
+      enabled: true
+      host: sso.example.com
+      port: 5566
+      app-access-id: app-xxx
+      app-secret-key: secret-xxx
+```
+
+<Callout type="info">
+OAuth2 授权流程始终使用 HTTP 传输，gRPC 仅用于用户信息、账户管理和商户服务等内部服务调用。
+</Callout>

@@ -1,0 +1,21 @@
+{
+  "title": "Go SDK",
+  "icon": "FileCode",
+  "description": "Beacon SSO SDK Go 版本",
+  "pages": [
+    "index",
+    "quick-start",
+    "environment",
+    "architecture",
+    "---OAuth2 子系统---",
+    "oauth2",
+    "---gRPC 服务---",
+    "grpc",
+    "---中间件---",
+    "middleware",
+    "---高级话题---",
+    "advanced",
+    "---API 参考---",
+    "api"
+  ]
+}

@@ -1,0 +1,219 @@
+---
+title: Auth 服务
+description: 认证服务：注册、登录、改密
+icon: ShieldCheck
+---
+
+# Auth 服务
+
+Auth 服务提供用户认证相关功能，包括注册、登录、修改密码和注销令牌。
+
+<Callout type="warn">
+Auth 服务需要在 metadata 中提供有效的 App 凭证（`app-access-id` 和 `app-secret-key`），由 `GrpcUtil` 自动注入。
+</Callout>
+
+## 接口概览
+
+| 方法 | 说明 | 返回 Token |
+|------|------|-----------|
+| `RegisterByEmail` | 邮箱注册 | Yes |
+| `PasswordLogin` | 密码登录 | Yes |
+| `ChangePassword` | 修改密码 | No |
+| `RevokeToken` | 注销令牌 | No |
+
+## RegisterByEmail
+
+通过邮箱验证码完成用户注册，注册成功后自动生成登录 Token。
+
+### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `email` | `string` | Yes | 邮箱地址 |
+| `password` | `string` | Yes | 密码 |
+| `username` | `string` | Yes | 用户名 |
+| `code` | `string` | Yes | 邮箱验证码 |
+| `nickname` | `string` | No | 昵称 |
+
+### 响应
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `userId` | `string` | 用户 ID |
+| `accessToken` | `string` | 访问令牌 |
+| `refreshToken` | `string` | 刷新令牌 |
+| `expiresIn` | `int64` | 过期时间（秒） |
+
+### 使用示例
+
+```java
+// 1. 先发送验证码
+ssoApi.pub().sendRegisterEmailCode(
+    SendRegisterEmailCodeRequest.newBuilder()
+        .setEmail("user@example.com")
+        .build()
+);
+
+// 2. 用户输入验证码后注册
+var resp = ssoApi.account().registerByEmail(
+    RegisterByEmailRequest.newBuilder()
+        .setEmail("user@example.com")
+        .setCode("123456")
+        .setUsername("newuser")
+        .setPassword("SecurePass123!")
+        .setNickname("New User")
+        .build()
+);
+
+System.out.printf("注册成功！用户 ID: %s%n", resp.getUserId());
+System.out.printf("Access Token: %s%n", resp.getAccessToken());
+```
+
+## PasswordLogin
+
+实现 OAuth 2.0 Resource Owner Password Credentials Grant，允许受信任的第一方客户端直接使用用户名和密码换取 Token。
+
+### 安全限制
+
+- **仅限第一方应用**（`App.FirstParty = enabled`）
+- 支持用户名/邮箱/手机号三种登录方式（自动识别）
+
+### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `username` | `string` | Yes | 用户名/邮箱/手机号 |
+| `password` | `string` | Yes | 密码 |
+| `scope` | `string` | No | 权限范围（如 `openid profile email`） |
+| `clientIp` | `string` | No | 客户端 IP 地址 |
+| `userAgent` | `string` | No | 客户端 User-Agent |
+
+### 响应
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `accessToken` | `string` | 访问令牌 |
+| `tokenType` | `string` | 令牌类型（通常为 `Bearer`） |
+| `expiresIn` | `int64` | 过期时间（秒） |
+| `refreshToken` | `string` | 刷新令牌 |
+| `scope` | `string` | 实际授权范围 |
+| `idToken` | `string` | ID Token（可选） |
+
+### 使用示例
+
+```java
+var resp = ssoApi.account().passwordLogin(
+    PasswordLoginRequest.newBuilder()
+        .setUsername("user@example.com")
+        .setPassword("SecurePass123!")
+        .setScope("openid profile email")
+        .build()
+);
+
+if (resp == null) {
+    throw new RuntimeException("登录失败");
+}
+
+System.out.println("登录成功！");
+System.out.printf("Access Token: %s%n", resp.getAccessToken());
+System.out.printf("过期时间: %d 秒%n", resp.getExpiresIn());
+```
+
+<Callout type="info">
+密码登录会自动缓存 Token，可通过 `AuthLogic` 相关方法获取。
+</Callout>
+
+## ChangePassword
+
+修改用户密码，支持普通模式和强制重置模式。
+
+### 模式说明
+
+| 模式 | 条件 | 旧密码 |
+|------|------|--------|
+| 普通模式 | `NeedResetPassword=false` | 必填 |
+| 强制重置模式 | `NeedResetPassword=true` | 可省略 |
+
+### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `userId` | `string` | Yes | 用户 ID |
+| `oldPassword` | `string` | 视模式 | 旧密码（普通模式必填） |
+| `newPassword` | `string` | Yes | 新密码 |
+
+### 使用示例
+
+```java
+// 普通模式修改密码
+ssoApi.account().changePassword(
+    ChangePasswordRequest.newBuilder()
+        .setUserId("user-123")
+        .setOldPassword("OldPass123!")
+        .setNewPassword("NewSecurePass456!")
+        .build()
+);
+
+// 强制重置模式（管理员场景，无需旧密码）
+ssoApi.account().changePassword(
+    ChangePasswordRequest.newBuilder()
+        .setUserId("user-123")
+        .setNewPassword("NewSecurePass456!")
+        .build()
+);
+```
+
+## RevokeToken
+
+注销用户 Token，实现用户登出功能。符合 RFC 7009 OAuth 2.0 Token Revocation 规范。
+
+### 使用场景
+
+- 用户主动登出
+- Token 泄露后的紧急注销
+
+### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `token` | `string` | Yes | 需要注销的 Token |
+| `tokenTypeHint` | `string` | No | 令牌类型提示（`access_token` / `refresh_token`） |
+
+### 使用示例
+
+```java
+// 注销 Access Token
+ssoApi.account().revokeToken(
+    RevokeTokenRequest.newBuilder()
+        .setToken(accessToken)
+        .setTokenTypeHint("access_token")
+        .build()
+);
+
+// 注销 Refresh Token
+ssoApi.account().revokeToken(
+    RevokeTokenRequest.newBuilder()
+        .setToken(refreshToken)
+        .setTokenTypeHint("refresh_token")
+        .build()
+);
+```
+
+<Callout type="info">
+SDK 的 HTTP 路由层调用 `RevokeToken` 后会自动清理本地缓存。
+</Callout>
+
+## HTTP 路由
+
+SDK 提供以下 Auth 相关 HTTP 路由（需启用 gRPC）：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/account/register/email` | 邮箱注册 |
+| POST | `/account/login/password` | 密码登录 |
+| POST | `/account/password/change` | 修改密码（需认证） |
+| POST | `/account/token/revoke` | 注销令牌（需认证） |
+
+<Callout type="warn">
+Auth 路由依赖 gRPC 服务，需配置 `beacon.sso.grpc.enabled=true` 及相关连接参数。
+</Callout>

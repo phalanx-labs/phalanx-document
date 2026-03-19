@@ -1,0 +1,137 @@
+---
+title: 错误处理
+description: SDK 错误码与异常处理
+icon: AlertTriangle
+---
+
+# 错误处理
+
+SDK 提供完整的异常体系，所有错误都携带对应的错误码信息，便于定位和处理。
+
+## 异常体系
+
+```
+RuntimeException
+└── SsoException (基类，携带 SsoErrorCode)
+    ├── SsoConfigurationException (配置异常，附带 configKey)
+    │   ├── SsoConfigurationException.missing(key)
+    │   └── SsoConfigurationException.invalid(key)
+    └── TokenException (Token 异常，附带 tokenType)
+        ├── tokenType: ACCESS_TOKEN
+        ├── tokenType: REFRESH_TOKEN
+        ├── tokenType: ID_TOKEN
+        └── tokenType: AUTHORIZATION_CODE
+```
+
+### SsoException
+
+所有 SDK 异常的基类，携带 `SsoErrorCode` 错误码枚举。
+
+### SsoConfigurationException
+
+配置相关异常，在缺少必填配置或配置无效时抛出。提供静态工厂方法快速创建：
+
+```java
+// 缺少配置
+throw SsoConfigurationException.missing("beacon.sso.client-id");
+
+// 配置无效
+throw SsoConfigurationException.invalid("beacon.sso.base-url");
+```
+
+### TokenException
+
+Token 相关异常，携带 `tokenType` 字段标识异常来源的 Token 类型：
+
+| TokenType | 说明 |
+|-----------|------|
+| `ACCESS_TOKEN` | Access Token 相关异常 |
+| `REFRESH_TOKEN` | Refresh Token 相关异常 |
+| `ID_TOKEN` | ID Token 相关异常 |
+| `AUTHORIZATION_CODE` | Authorization Code 相关异常 |
+
+## 错误码
+
+### 错误码列表
+
+| 错误码 | 说明 |
+|--------|------|
+| `INVALID_STATE` | OAuth State 无效或过期 |
+| `INVALID_CODE` | 授权码无效 |
+| `TOKEN_EXPIRED` | Access Token 过期 |
+| `TOKEN_INVALID` | Access Token 无效 |
+| `USERINFO_FAILED` | 获取用户信息失败 |
+| `INTROSPECTION_FAILED` | Token 自省失败 |
+| `PKCE_ERROR` | PKCE 生成或验证失败 |
+| `NETWORK_ERROR` | 网络请求失败 |
+| `CONFIGURATION_ERROR` | SDK 配置错误 |
+| `GRPC_NOT_ENABLED` | gRPC 未启用 |
+
+## 错误响应格式
+
+SDK 的错误响应遵循统一的 JSON 格式：
+
+```json
+{
+  "code": 401,
+  "message": "访问令牌已过期",
+  "data": null
+}
+```
+
+## 错误处理示例
+
+### 基本用法
+
+```java
+@RestController
+@RequestMapping("/api")
+public class DemoController {
+
+    private final SsoApi ssoApi;
+
+    public DemoController(SsoApi ssoApi) {
+        this.ssoApi = ssoApi;
+    }
+
+    @GetMapping("/userinfo")
+    public BaseResponse<UserinfoResult> getUserinfo(HttpServletRequest request) {
+        String token = SsoSecurityUtil.getCurrentToken(request).orElse(null);
+
+        try {
+            UserinfoResult result = ssoApi.user().getCurrentUser(token);
+            return BaseResponse.success("获取成功", result);
+        } catch (SsoException e) {
+            // 根据 ErrorCode 处理不同错误
+            if (e.getErrorCode() == SsoErrorCode.TOKEN_EXPIRED) {
+                return BaseResponse.error(401, "Token 已过期，请重新登录");
+            }
+            if (e.getErrorCode() == SsoErrorCode.NETWORK_ERROR) {
+                return BaseResponse.error(500, "网络异常，请稍后重试");
+            }
+            return BaseResponse.error(500, e.getMessage());
+        }
+    }
+}
+```
+
+### 处理 Token 异常
+
+```java
+try {
+    TokenResult result = ssoApi.oauth().refreshToken(refreshToken);
+} catch (TokenException e) {
+    if (e.getTokenType() == TokenException.TokenType.REFRESH_TOKEN) {
+        // Refresh Token 无效，需要重新登录
+        redirect("/oauth/login");
+    }
+}
+```
+
+## 最佳实践
+
+1. **始终捕获 SsoException** — 在调用 SDK API 时，使用 try-catch 捕获 `SsoException`，根据 `ErrorCode` 进行差异化处理
+2. **区分客户端和服务端错误** — Token 过期/无效属于 401 客户端错误，网络异常属于 500 服务端错误
+3. **不暴露敏感信息** — 在返回给前端的错误消息中，不要包含 Token、Secret 等敏感信息
+4. **合理使用日志** — 对 `NETWORK_ERROR`、`CONFIGURATION_ERROR` 等异常记录 Error 级别日志，便于排查问题
+5. **优雅降级** — 在 gRPC 不可用时（`GRPC_NOT_ENABLED`），考虑使用 HTTP 回退方案

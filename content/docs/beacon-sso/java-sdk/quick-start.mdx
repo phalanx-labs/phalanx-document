@@ -1,0 +1,128 @@
+---
+title: 快速开始
+description: 5 分钟快速集成 Beacon SSO Java SDK
+icon: Rocket
+---
+
+# 快速开始
+
+本指南将帮助你在 5 分钟内完成 Beacon SSO Java SDK 的集成。
+
+## 添加依赖
+
+在 `pom.xml` 中添加 SDK 依赖：
+
+```xml
+<dependency>
+    <groupId>com.frontleaves.phalanx.beacon.sso</groupId>
+    <artifactId>bamboo-sso-sdk-springboot</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+</dependency>
+```
+
+## 配置
+
+在 `application.yml` 中添加最小配置：
+
+```yaml
+beacon:
+  sso:
+    base-url: https://sso.example.com
+    client-id: your-client-id
+    client-secret: your-client-secret
+    redirect-uri: http://localhost:8080/oauth/callback
+```
+
+<Callout type="info">
+SDK 通过 Spring Boot 自动配置机制，会在应用启动时自动注册 Filter、Controller 和 AOP 切面。你无需编写任何额外代码即可使用 OAuth2 登录流程。
+</Callout>
+
+## 启动应用
+
+添加依赖和配置后，直接启动你的 Spring Boot 应用即可：
+
+```java
+@SpringBootApplication
+public class DemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DemoApplication.class, args);
+    }
+}
+```
+
+## 使用示例
+
+### 获取当前用户信息
+
+SDK 自动注册了 `BeaconSsoFilter`，所有请求（排除 `beacon.sso.exclude-urls` 配置的路径）都会进行 Token 验证。在 Controller 中通过 `@InjectData` 注解获取用户信息：
+
+```java
+@RestController
+@RequestMapping("/api")
+public class DemoController {
+
+    @GetMapping("/profile")
+    public BaseResponse<UserDetailResult> getProfile(
+            @InjectData("sub") String userId) {
+        // 直接使用注入的 userId
+        return BaseResponse.success("获取成功", null);
+    }
+}
+```
+
+### 注入完整 Token 信息
+
+```java
+@GetMapping("/token-info")
+public BaseResponse<IntrospectResult> getTokenInfo(
+        @InjectData IntrospectResult introspectResult) {
+    return BaseResponse.success("获取成功", introspectResult);
+}
+```
+
+## 默认路由
+
+SDK 自动注册以下路由（路径前缀可配置）：
+
+### OAuth2 路由
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/oauth/login` | 302 重定向到 SSO 授权页面 |
+| GET | `/oauth/callback` | OAuth2 回调，用 code 换 token |
+| GET | `/oauth/logout` | 注销并清除 Session |
+| GET | `/oauth/status` | 获取当前认证状态 |
+
+### 账户路由
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/account/register/email` | 邮箱注册 |
+| POST | `/account/login/password` | 密码登录 |
+| POST | `/account/password/change` | 修改密码 |
+| POST | `/account/logout` | 注销 Token |
+
+### 用户路由（需 gRPC）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/user/userinfo` | 获取当前用户信息 |
+| GET | `/user/{userId}` | 根据 ID 获取用户详情 |
+
+<Callout type="warn">
+账户路由和用户路由依赖 gRPC 服务，需额外配置 `beacon.sso.grpc.enabled=true` 及相关连接参数。
+</Callout>
+
+## 验证安装
+
+启动服务后，访问以下地址测试：
+
+1. **登录跳转**: `GET http://localhost:8080/oauth/login`
+2. **认证状态**: `GET http://localhost:8080/oauth/status`
+
+## 下一步
+
+- [配置参考](./configuration) - 了解所有可配置项
+- [架构设计](./architecture) - 理解 SDK 的整体架构
+- [OAuth2 子系统](./oauth2) - 深入了解授权流程
+- [gRPC 服务](./grpc) - 启用和使用 gRPC 客户端

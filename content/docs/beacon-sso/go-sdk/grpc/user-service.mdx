@@ -1,0 +1,158 @@
+---
+title: User 服务
+description: 用户服务 API
+icon: User
+---
+
+# User 服务
+
+User 服务提供用户信息查询功能。
+
+<Callout type="warn">
+User 服务需要在 metadata 中提供 App 凭证和用户 Token。
+</Callout>
+
+## 接口概览
+
+| 方法 | 说明 | Token 来源 |
+|------|------|-----------|
+| `GetCurrentUser` | 获取当前登录用户信息 | 从 Token 中提取 |
+| `GetUserByID` | 根据用户 ID 获取信息 | 需要提供 user_id |
+
+## GetCurrentUser
+
+获取当前登录用户的详细信息。
+
+### 方法签名
+
+```go
+func (s *UserService) GetCurrentUser(
+    ctx context.Context,
+    accessToken string,
+) (*pb.GetCurrentUserResponse, error)
+```
+
+### 响应
+
+```go
+type GetCurrentUserResponse struct {
+    UserId           string // 用户 ID
+    Username         string // 用户名
+    Nickname         string // 昵称
+    Email            string // 邮箱
+    Phone            string // 手机号
+    Avatar           string // 头像 URL
+    Status           int32  // 状态
+    // ... 其他字段
+}
+```
+
+### 使用示例
+
+```go
+import (
+    "context"
+    bSdkClient "github.com/phalanx-labs/beacon-sso-sdk/client"
+)
+
+func main() {
+    ctx := context.Background()
+
+    client := bSdkClient.NewClient(
+        bSdkClient.WithConnect("sso.example.com", "5566"),
+        bSdkClient.WithAppAccess("app-id", "app-secret"),
+    )
+
+    // 假设 accessToken 来自登录响应或请求头
+    accessToken := "eyJhbGciOiJSUzI1NiIs..."
+
+    // 获取当前用户信息
+    user, err := client.User.GetCurrentUser(ctx, accessToken)
+    if err != nil {
+        panic(err)
+    }
+
+    fmt.Printf("用户 ID: %s\n", user.UserId)
+    fmt.Printf("用户名: %s\n", user.Username)
+    fmt.Printf("邮箱: %s\n", user.Email)
+}
+```
+
+## GetUserByID
+
+根据用户 ID 获取指定用户的详细信息。主要用于接入 App 需要获取其他用户信息的场景。
+
+### 与 GetCurrentUser 的区别
+
+| 方法 | 信息来源 | 用途 |
+|------|---------|------|
+| `GetCurrentUser` | 从 Token 中获取 | 获取当前登录用户信息 |
+| `GetUserByID` | 通过 user_id 参数 | 获取任意用户信息 |
+
+### 方法签名
+
+```go
+func (s *UserService) GetUserByID(
+    ctx context.Context,
+    accessToken string,
+    req *pb.GetUserByIDRequest,
+) (*pb.GetUserByIDResponse, error)
+```
+
+### 请求参数
+
+```go
+type GetUserByIDRequest struct {
+    UserId string // 目标用户 ID
+}
+```
+
+### 响应
+
+```go
+type GetUserByIDResponse struct {
+    UserId           string // 用户 ID
+    Username         string // 用户名
+    Nickname         string // 昵称
+    Email            string // 邮箱
+    Phone            string // 手机号
+    Avatar           string // 头像 URL
+    Status           int32  // 状态
+    // ... 其他字段
+}
+```
+
+### 使用示例
+
+```go
+// 获取指定用户信息
+user, err := client.User.GetUserByID(ctx, accessToken, &pb.GetUserByIDRequest{
+    UserId: "target-user-123",
+})
+if err != nil {
+    panic(err)
+}
+
+fmt.Printf("用户名: %s\n", user.Username)
+```
+
+## HTTP 路由
+
+SDK 提供以下 User 相关 HTTP 路由：
+
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/api/user/userinfo` | CheckAuth | 获取当前用户信息 |
+| GET | `/api/user/by-id` | CheckAuth | 根据 ID 获取用户信息 |
+
+### 请求示例
+
+```bash
+# 获取当前用户信息
+GET /api/user/userinfo HTTP/1.1
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+
+# 根据 ID 获取用户信息
+GET /api/user/by-id?user_id=target-user-123 HTTP/1.1
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+```

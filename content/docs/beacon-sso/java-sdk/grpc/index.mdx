@@ -1,0 +1,152 @@
+---
+title: gRPC 服务
+description: gRPC 服务客户端概览
+icon: Network
+---
+
+# gRPC 服务
+
+Java SDK 使用标准 [gRPC](https://grpc.io/) 协议提供认证、用户、商户和公共四大服务。与 Go SDK 不同，Java SDK 采用原生 gRPC Stub 而非 Connect-RPC。
+
+## 协议说明
+
+SDK 使用标准 gRPC 框架，基于 HTTP/2 传输，具有以下特点：
+
+- 原生 gRPC Stub，支持双向流式通信
+- 基于 Protocol Buffers 序列化，高性能低延迟
+- 通过 `ManagedChannel` 管理连接生命周期
+
+## 可选启用
+
+gRPC 服务默认**关闭**，需手动启用。若未启用，gRPC 专属方法将抛出 `SsoConfigurationException(GRPC_NOT_ENABLED)` 异常。
+
+### 启用配置
+
+在 `application.yml` 中添加 gRPC 配置：
+
+```yaml
+beacon:
+  sso:
+    grpc:
+      enabled: true
+      host: sso.example.com
+      port: 5566
+      app-access-id: app-xxx
+      app-secret-key: secret-xxx
+```
+
+<Callout type="warn">
+若 gRPC 未启用，调用 gRPC 专属方法将抛出 `SsoConfigurationException(GRPC_NOT_ENABLED)` 异常。
+</Callout>
+
+## SsoApi 入口
+
+SDK 通过 `SsoApi` Facade 统一暴露所有服务，通过 Spring IoC 注入使用：
+
+```java
+@Autowired
+private SsoApi ssoApi;
+
+// 账户服务（gRPC）
+ssoApi.account().registerByEmail(request);
+
+// 用户服务（gRPC 优先，HTTP 回退）
+ssoApi.user().getCurrentUser(accessToken);
+
+// 商户服务（gRPC）
+ssoApi.merchant().getMerchantTags();
+
+// 公共服务（gRPC）
+ssoApi.pub().sendRegisterEmailCode(request);
+```
+
+## 服务概览
+
+| 服务 | 说明 | 认证要求 |
+|------|------|----------|
+| [Auth 服务](./auth-service) | 注册、登录、改密、注销令牌 | App 凭证 |
+| [User 服务](./user-service) | 获取用户信息 | App 凭证 + User Token |
+| [Merchant 服务](./merchant-service) | 商户标签与公告 | App 凭证 |
+| [Public 服务](./public-service) | 验证码发送 | 无 |
+
+## 认证机制
+
+### App 凭证
+
+Auth、User、Merchant 服务需要在 gRPC metadata 中提供 App 凭证：
+
+```java
+// GrpcUtil 自动注入以下 metadata：
+// app-access-id: your-app-access-id
+// app-secret-key: your-app-secret-key
+```
+
+凭证通过 `beacon.sso.grpc.app-access-id` 和 `beacon.sso.grpc.app-secret-key` 配置，由 `GrpcUtil` 在每次调用时自动附加，无需手动处理。
+
+### User Token
+
+User 服务还需要在 metadata 中提供用户 Token：
+
+```java
+// 调用方法时传入 accessToken 参数
+ssoApi.user().getCurrentUser(accessToken);
+```
+
+<Callout type="info">
+服务封装层会自动处理 metadata 注入，你只需在调用时传入 `accessToken` 参数。
+</Callout>
+
+## 使用示例
+
+```java
+import com.frontleaves.phalanx.beacon.sso.api.SsoApi;
+import org.springframework.beans.factory.annotation.Autowired;
+
+@Service
+public class DemoService {
+
+    @Autowired
+    private SsoApi ssoApi;
+
+    public void demo() {
+        // 使用 Public 服务（发送验证码）
+        ssoApi.pub().sendRegisterEmailCode(
+            SendRegisterEmailCodeRequest.newBuilder()
+                .setEmail("user@example.com")
+                .build()
+        );
+
+        // 使用 Auth 服务（密码登录）
+        var loginResp = ssoApi.account().passwordLogin(
+            PasswordLoginRequest.newBuilder()
+                .setUsername("user@example.com")
+                .setPassword("password123")
+                .setScope("openid profile email")
+                .build()
+        );
+
+        // 使用 User 服务（需要 accessToken）
+        var userResp = ssoApi.user().getCurrentUser(loginResp.getAccessToken());
+
+        // 使用 Merchant 服务
+        var tagsResp = ssoApi.merchant().getMerchantTags();
+    }
+}
+```
+
+## 子文档
+
+<CardGroup cols={4}>
+  <Card title="Auth 服务" href="./auth-service">
+    注册、登录、修改密码、注销令牌
+  </Card>
+  <Card title="User 服务" href="./user-service">
+    获取当前用户、按 ID 查询
+  </Card>
+  <Card title="Merchant 服务" href="./merchant-service">
+    商户标签、公告管理
+  </Card>
+  <Card title="Public 服务" href="./public-service">
+    发送注册验证码等公共功能
+  </Card>
+</CardGroup>
