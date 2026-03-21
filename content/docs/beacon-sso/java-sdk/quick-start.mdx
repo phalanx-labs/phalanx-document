@@ -1,16 +1,19 @@
 ---
 title: 快速开始
-description: 5 分钟快速集成 Beacon SSO Java SDK
+description: 5 分钟完成 Beacon SSO Java SDK 接入
 icon: Rocket
 ---
 
 # 快速开始
 
-本指南将帮助你在 5 分钟内完成 Beacon SSO Java SDK 的集成。
+本指南聚焦“导入后怎么用”:
+- 添加依赖
+- 最小配置可启动
+- 在 Controller 中完成“注入用户信息 + 权限校验”
 
-## 添加依赖
+## 1. 添加依赖
 
-在 `pom.xml` 中添加 SDK 依赖：
+在 `pom.xml` 中引入 Starter：
 
 ```xml
 <dependency>
@@ -20,26 +23,43 @@ icon: Rocket
 </dependency>
 ```
 
-## 配置
-
-在 `application.yml` 中添加最小配置：
+## 2. 配置 `application.yml`
 
 ```yaml
 beacon:
   sso:
+    enabled: true
     base-url: https://sso.example.com
     client-id: your-client-id
     client-secret: your-client-secret
     redirect-uri: http://localhost:8080/oauth/callback
+
+    # 建议显式排除登录与公开接口，避免被 Filter 拦截
+    exclude-urls:
+      - /oauth/**
+      - /api/v1/account/login/**
+      - /api/v1/account/register/**
+      - /api/v1/public/**
+```
+
+如果你要启用 gRPC（账户/用户/商户接口依赖）：
+
+```yaml
+beacon:
+  sso:
+    grpc:
+      enabled: true
+      host: sso.example.com
+      port: 5566
+      app-access-id: app-xxx
+      app-secret-key: secret-xxx
 ```
 
 <Callout type="info">
-SDK 通过 Spring Boot 自动配置机制，会在应用启动时自动注册 Filter、Controller 和 AOP 切面。你无需编写任何额外代码即可使用 OAuth2 登录流程。
+SDK 启动后会自动注册 `BeaconSsoFilter`、默认 Controller、`@InjectData` / `@PermissionVerify` 切面。
 </Callout>
 
-## 启动应用
-
-添加依赖和配置后，直接启动你的 Spring Boot 应用即可：
+## 3. 启动应用
 
 ```java
 @SpringBootApplication
@@ -50,79 +70,76 @@ public class DemoApplication {
 }
 ```
 
-## 使用示例
+## 4. 在业务 Controller 中使用注解
 
-### 获取当前用户信息
-
-SDK 自动注册了 `BeaconSsoFilter`，所有请求（排除 `beacon.sso.exclude-urls` 配置的路径）都会进行 Token 验证。在 Controller 中通过 `@InjectData` 注解获取用户信息：
+### 注入用户字段 + 验权
 
 ```java
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/demo")
 public class DemoController {
 
-    @GetMapping("/profile")
-    public BaseResponse<UserDetailResult> getProfile(
-            @InjectData("sub") String userId) {
-        // 直接使用注入的 userId
-        return BaseResponse.success("获取成功", null);
+    @GetMapping("/me")
+    @PermissionVerify(value = {"profile:read"})
+    public BaseResponse<Map<String, Object>> me(
+            @InjectData("sub") String userId,
+            @InjectData("scope") List<String> scopes) {
+        return BaseResponse.success("ok", Map.of(
+                "userId", userId,
+                "scopes", scopes
+        ));
     }
 }
 ```
 
-### 注入完整 Token 信息
+- `@InjectData("sub")`: 注入当前登录用户 ID
+- `@PermissionVerify`: 校验 token 的 `scope` 是否包含目标权限
+- `requireAll=true`（默认）表示全量匹配；`false` 表示任一匹配
 
-```java
-@GetMapping("/token-info")
-public BaseResponse<IntrospectResult> getTokenInfo(
-        @InjectData IntrospectResult introspectResult) {
-    return BaseResponse.success("获取成功", introspectResult);
-}
-```
+## 5. 默认路由（按源码默认值）
 
-## 默认路由
+### OAuth2 路由（默认前缀: `/oauth`）
 
-SDK 自动注册以下路由（路径前缀可配置）：
+| 方法 | 路径 |
+|------|------|
+| GET | `/oauth/login` |
+| GET | `/oauth/callback` |
+| GET | `/oauth/logout` |
+| GET | `/oauth/status` |
 
-### OAuth2 路由
+### 账户路由（默认前缀: `/api/v1/account`）
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/oauth/login` | 302 重定向到 SSO 授权页面 |
-| GET | `/oauth/callback` | OAuth2 回调，用 code 换 token |
-| GET | `/oauth/logout` | 注销并清除 Session |
-| GET | `/oauth/status` | 获取当前认证状态 |
+| 方法 | 路径 |
+|------|------|
+| POST | `/api/v1/account/register/email` |
+| POST | `/api/v1/account/login/password` |
+| POST | `/api/v1/account/password/change` |
+| POST | `/api/v1/account/logout` |
 
-### 账户路由
+### 用户路由（默认前缀: `/api/v1/user`）
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/account/register/email` | 邮箱注册 |
-| POST | `/account/login/password` | 密码登录 |
-| POST | `/account/password/change` | 修改密码 |
-| POST | `/account/logout` | 注销 Token |
+| 方法 | 路径 |
+|------|------|
+| GET | `/api/v1/user/userinfo` |
+| GET | `/api/v1/user/{userId}` |
 
-### 用户路由（需 gRPC）
+### 公共路由（默认前缀: `/api/v1/public`）
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/user/userinfo` | 获取当前用户信息 |
-| GET | `/user/{userId}` | 根据 ID 获取用户详情 |
+| 方法 | 路径 |
+|------|------|
+| POST | `/api/v1/public/register/email/code` |
 
-<Callout type="warn">
-账户路由和用户路由依赖 gRPC 服务，需额外配置 `beacon.sso.grpc.enabled=true` 及相关连接参数。
-</Callout>
-
-## 验证安装
+## 6. 验证接入
 
 启动服务后，访问以下地址测试：
 
-1. **登录跳转**: `GET http://localhost:8080/oauth/login`
-2. **认证状态**: `GET http://localhost:8080/oauth/status`
+1. `GET http://localhost:8080/oauth/login`（应重定向到 SSO）
+2. `GET http://localhost:8080/oauth/status`（查看认证状态）
+3. 带 `Authorization: Bearer <token>` 访问你的业务受保护接口
 
 ## 下一步
 
 - [配置参考](./configuration) - 了解所有可配置项
-- [架构设计](./architecture) - 理解 SDK 的整体架构
-- [OAuth2 子系统](./oauth2) - 深入了解授权流程
-- [gRPC 服务](./grpc) - 启用和使用 gRPC 客户端
+- [认证过滤器](./filter/auth-filter) - 过滤器与排除路径策略
+- [@PermissionVerify](./aop/permission-verify) - 精准权限控制
+- [gRPC 服务](./grpc) - 启用并使用账户/用户/商户能力

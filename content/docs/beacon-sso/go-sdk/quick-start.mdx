@@ -1,22 +1,53 @@
 ---
 title: 快速开始
-description: 5 分钟快速集成 Beacon SSO SDK
+description: 5 分钟完成 Beacon SSO Go SDK 接入
 icon: Rocket
 ---
 
 # 快速开始
 
-本指南将帮助你在 5 分钟内完成 Beacon SSO SDK 的集成。
+本指南聚焦“怎么用”:
+- 如何导入 SDK
+- 如何注册 SDK 路由
+- 如何给业务接口加鉴权
 
-## 安装
+## 1. 安装依赖
 
 ```bash
 go get github.com/phalanx-labs/beacon-sso-sdk
 ```
 
-## 完整示例
+## 2. 配置环境变量
 
-以下是一个完整的 Gin 服务示例，集成了 OAuth2 登录和 gRPC 服务：
+### 必填: OAuth2 + 基础能力
+
+```bash
+SSO_CLIENT_ID=your-client-id
+SSO_CLIENT_SECRET=your-client-secret
+SSO_REDIRECT_URI=http://localhost:8080/api/oauth/callback
+SSO_ENDPOINT_AUTH_URI=https://sso.example.com/oauth/authorize
+SSO_ENDPOINT_TOKEN_URI=https://sso.example.com/oauth/token
+SSO_ENDPOINT_USERINFO_URI=https://sso.example.com/oauth/userinfo
+SSO_ENDPOINT_INTROSPECTION_URI=https://sso.example.com/oauth/introspect
+SSO_ENDPOINT_REVOCATION_URI=https://sso.example.com/oauth/revoke
+```
+
+### 必填: gRPC 能力（账户/用户/商户接口）
+
+```bash
+SSO_GRPC_HOST=sso.example.com
+SSO_GRPC_PORT=5566
+```
+
+### 可选: 使用 Well-Known 自动发现端点
+
+```bash
+SSO_WELL_KNOWN_URI=https://sso.example.com/.well-known/openid-configuration
+```
+
+> 配置了 `SSO_WELL_KNOWN_URI` 后，可由元数据自动发现 OAuth 端点。
+
+## 3. 启动并挂载路由（完整示例）
 
 ```go
 package main
@@ -30,6 +61,7 @@ import (
 	xResult "github.com/bamboo-services/bamboo-base-go/major/result"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+	bSdkMiddleware "github.com/phalanx-labs/beacon-sso-sdk/middleware"
 	bSdkRoute "github.com/phalanx-labs/beacon-sso-sdk/route"
 	bSdkStartup "github.com/phalanx-labs/beacon-sso-sdk/startup"
 	"gorm.io/gorm"
@@ -52,19 +84,21 @@ func main() {
 		})
 	})
 
-	// 3) 挂载 SDK 路由
+	// 3) 挂载 SDK 路由（登录、账户、用户）
 	sdkRoute := bSdkRoute.NewRoute(reg.Init.Ctx)
-
-	// OAuth2 路由（登录/回调/登出）
 	sdkRoute.OAuthRouter(reg.Serve.Group("/api"))
-
-	// 账户路由（注册/密码登录/刷新令牌）
 	sdkRoute.AccountRouter(reg.Serve.Group("/api"))
-
-	// 用户路由（获取用户信息）
 	sdkRoute.UserRouter(reg.Serve.Group("/api"))
 
-	// 4) 启动服务
+	// 4) 给你的业务路由加鉴权中间件
+	protected := reg.Serve.Group("/api/private")
+	protected.Use(bSdkMiddleware.CheckAuth(reg.Init.Ctx))
+	protected.GET("/profile", func(c *gin.Context) {
+		token, _ := c.Get("authorization")
+		xResult.SuccessHasData(c, "访问成功", gin.H{"token": token})
+	})
+
+	// 5) 启动服务
 	_ = reg.Serve.Run(":8080")
 }
 
@@ -83,69 +117,31 @@ func initRedis(ctx context.Context) (any, error) {
 }
 ```
 
-## 默认路由
+## 4. SDK 默认路由（按上面示例前缀 `/api`）
 
-SDK 会自动注册以下路由：
+| 路由组 | 方法 | 路径 | 用途 |
+|------|------|------|------|
+| OAuth2 | GET | `/api/oauth/login` | 跳转到 SSO 登录 |
+| OAuth2 | GET | `/api/oauth/callback` | 处理回调，交换令牌 |
+| OAuth2 | POST | `/api/oauth/logout` | 注销 |
+| Account | POST | `/api/account/register/email` | 邮箱注册 |
+| Account | POST | `/api/account/login/password` | 密码登录 |
+| Account | POST | `/api/account/token/refresh` | 刷新令牌 |
+| Account | POST | `/api/account/password/change` | 修改密码（需登录） |
+| Account | POST | `/api/account/token/revoke` | 注销令牌（需登录） |
+| User | GET | `/api/user/userinfo` | 获取当前用户（需登录） |
+| User | GET | `/api/user/by-id` | 按用户 ID 查询（需登录，query: `user_id`） |
 
-### OAuth2 路由
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/oauth/login` | 302 重定向到 SSO 授权页面 |
-| GET | `/api/oauth/callback` | OAuth2 回调，用 code 换 token |
-| POST | `/api/oauth/logout` | 注销 token |
-
-### 账户路由
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/account/register/email` | 邮箱注册 |
-| POST | `/api/account/login/password` | 密码登录 |
-| POST | `/api/account/token/refresh` | 刷新令牌 |
-| POST | `/api/account/password/change` | 修改密码 |
-| POST | `/api/account/token/revoke` | 注销令牌 |
-
-### 用户路由
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/user/userinfo` | 获取当前用户信息 |
-| GET | `/api/user/by-id` | 根据 ID 获取用户信息 |
-
-## 环境变量配置
-
-在运行前，请确保配置以下环境变量：
-
-```bash
-# 必填 - OAuth2 配置
-SSO_CLIENT_ID=your-client-id
-SSO_CLIENT_SECRET=your-client-secret
-SSO_REDIRECT_URI=http://localhost:8080/api/oauth/callback
-SSO_ENDPOINT_AUTH_URI=https://sso.example.com/oauth/authorize
-SSO_ENDPOINT_TOKEN_URI=https://sso.example.com/oauth/token
-SSO_ENDPOINT_USERINFO_URI=https://sso.example.com/oauth/userinfo
-SSO_ENDPOINT_INTROSPECTION_URI=https://sso.example.com/oauth/introspect
-SSO_ENDPOINT_REVOCATION_URI=https://sso.example.com/oauth/revoke
-
-# 必填 - gRPC 配置
-SSO_GRPC_HOST=sso.example.com
-SSO_GRPC_PORT=5566
-```
-
-<Callout type="info">
-完整的环境变量说明请参考 [环境变量配置](./environment)。
-</Callout>
-
-## 验证安装
+## 5. 验证接入
 
 启动服务后，访问以下地址测试：
-
-1. **登录跳转**: `GET http://localhost:8080/api/oauth/login`
-2. **服务状态**: `GET http://localhost:8080/api/status`
+1. `GET http://localhost:8080/api/status`（服务存活）
+2. `GET http://localhost:8080/api/oauth/login`（跳转 SSO）
+3. 带 `Authorization: Bearer <token>` 请求 `GET /api/private/profile`（验证鉴权中间件）
 
 ## 下一步
 
-- [环境变量配置](./environment) - 了解所有可配置项
-- [架构设计](./architecture) - 理解 SDK 的整体架构
-- [OAuth2 子系统](./oauth2) - 深入了解授权流程
-- [gRPC 服务](./grpc) - 使用 gRPC 客户端
+- [环境变量配置](./environment) - 完整配置项说明
+- [认证检查中间件](./middleware/auth-check) - 保护你的业务接口
+- [OAuth2 子系统](./oauth2) - 登录流程和 Token 相关接口
+- [gRPC 服务](./grpc) - 账户、用户、商户能力

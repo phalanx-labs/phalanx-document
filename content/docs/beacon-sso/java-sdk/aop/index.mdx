@@ -1,26 +1,29 @@
 ---
 title: AOP 切面
-description: Spring AOP 注解概览
+description: 在 Controller 中如何使用 AOP 注解完成用户注入与权限校验
 icon: Scissors
 ---
 
 # AOP 切面
 
-SDK 提供 Spring AOP 注解，用于在 Controller 方法执行前进行参数注入和权限验证。
+SDK 提供两个 AOP 注解，直接服务于业务 Controller 开发。
 
-## 可用注解
+## 使用顺序
 
-| 注解 | 说明 |
+1. `BeaconSsoFilter` 先完成 token 校验，并写入请求属性
+2. `@InjectData` 从请求属性注入用户数据
+3. `@PermissionVerify` 基于 `scope` 校验权限
+4. 校验通过后执行 Controller 代码
+
+## 什么时候用哪个注解
+
+| 注解 | 适用场景 |
 |------|------|
-| [@InjectData](./inject-data) | 自动注入用户数据到 Controller 方法参数 |
-| [@PermissionVerify](./permission-verify) | 基于 scope 的权限验证 |
-
-## 前置条件
-
-AOP 切面依赖 `BeaconSsoFilter` 先完成 Token 认证。过滤器会将 `IntrospectResult` 存入 Request Attribute，AOP 切面再从中读取数据进行注入或权限校验。
+| [@InjectData](./inject-data) | 你只想拿当前用户 ID、scope、token 信息 |
+| [@PermissionVerify](./permission-verify) | 你希望在方法执行前直接做权限门禁 |
 
 <Callout type="warn">
-请确保 `BeaconSsoFilter` 已正确配置且处于启用状态，否则 AOP 注解将无法获取到用户认证信息。
+如果 `BeaconSsoFilter` 没有命中请求，AOP 注解无法拿到认证上下文。
 </Callout>
 
 ## 子文档

@@ -1,162 +1,57 @@
 ---
-title: 架构设计
-description: Beacon SSO SDK 架构设计说明
+title: 接入流程
+description: 在业务项目中如何落地使用 Beacon SSO Go SDK
 icon: Cubes
 ---
 
-# 架构设计
+# 接入流程
 
-Beacon SSO SDK 采用分层架构设计，与 bamboo-base-go 框架深度集成。
+本页不讲 SDK 内部实现，只讲你在项目里如何接入。
 
-## 整体架构
+## 1. 依赖准备
+
+在调用 `bSdkStartup.NewStartupConfig()` 前，确保你已经提供：
+
+- `Database` 节点（`*gorm.DB`）
+- `Redis` 节点（`*redis.Client`）
+- `SSO_*` 环境变量（至少 OAuth2 + gRPC 关键配置）
+
+## 2. 应用内调用顺序
 
 ```mermaid
-graph TB
-    subgraph Application[应用层]
-        Route[Route 路由注册]
-        Handler[Handler 请求处理]
-        Middleware[Middleware 中间件]
-    end
-
-    subgraph Business[业务层]
-        OAuthLogic[OAuthLogic<br/>OAuth 逻辑]
-        AuthLogic[AuthLogic<br/>认证逻辑]
-        UserLogic[UserLogic<br/>用户逻辑]
-        BusinessLogic[BusinessLogic<br/>业务逻辑]
-    end
-
-    subgraph Client[客户端层]
-        SsoClient[SsoClient<br/>gRPC 客户端]
-        OAuth2[OAuth2 Config<br/>HTTP 客户端]
-    end
-
-    subgraph Data[数据层]
-        Repository[Repository 数据仓储]
-        Cache[Redis 缓存]
-    end
-
-    subgraph External[外部服务]
-        SSOServer[SSO Server<br/>OAuth2 + gRPC]
-    end
-
-    Route --> Handler
-    Handler --> OAuthLogic
-    Handler --> AuthLogic
-    Handler --> UserLogic
-    Middleware --> OAuthLogic
-
-    OAuthLogic --> OAuth2
-    OAuthLogic --> Repository
-    AuthLogic --> SsoClient
-    UserLogic --> SsoClient
-    BusinessLogic --> OAuth2
-
-    SsoClient --> SSOServer
-    OAuth2 --> SSOServer
-    Repository --> Cache
+flowchart TD
+  A[导入 SDK] --> B[追加 NewStartupConfig 节点]
+  B --> C[注册 OAuth/Account/User 路由]
+  C --> D[业务接口加 CheckAuth]
+  D --> E[按需调用 gRPC/HTTP 能力]
 ```
 
-## 依赖注入模式
+## 3. 两种常见接入模式
 
-SDK 采用 bamboo-base-go 的 Register 依赖注入模式：
+### 模式 A: 只用登录流程（OAuth2）
 
 ```go
-// startup/startup.go
-func NewStartupConfig(exclude ...string) []xRegNode.RegNodeList
+nodes = append(nodes, bSdkStartup.NewStartupConfig("ssoClient")...)
 ```
 
-该函数聚合了以下注册节点：
+适合只需要登录、回调、登出、Token 验证的场景。
 
-| 节点名称 | 说明 |
-|---------|------|
-| `oAuthConfig` | OAuth2 核心配置（ClientID、Endpoint 等） |
-| `oAuthRedirectURI` | OAuth2 重定向地址 |
-| `ssoClient` | SsoClient gRPC 客户端 |
-
-### 排除节点
-
-你可以通过 `exclude` 参数排除特定节点：
+### 模式 B: OAuth2 + 账户/用户/商户接口（默认）
 
 ```go
-// 排除 gRPC 客户端（仅使用 OAuth2）
-nodes := bSdkStartup.NewStartupConfig("ssoClient")
-
-// 排除 OAuth 配置（使用自定义配置）
-nodes := bSdkStartup.NewStartupConfig("oAuthConfig", "oAuthRedirectURI")
+nodes = append(nodes, bSdkStartup.NewStartupConfig()...)
 ```
 
-## 核心模块职责
+适合要直接调用 SDK 账户和用户接口的场景。
 
-| 模块 | 目录 | 职责 |
+## 4. 认证能力怎么落地
+
+| 目标 | 用法 | 结果 |
 |------|------|------|
-| **Startup** | `startup/` | 依赖注入节点定义 |
-| **Route** | `route/` | Gin 路由注册 |
-| **Handler** | `handler/` | HTTP 请求处理 |
-| **Logic** | `logic/` | 业务逻辑封装 |
-| **Client** | `client/` | gRPC 客户端 |
-| **Repository** | `repository/` | 数据仓储层 |
-| **Models** | `models/` | 数据模型定义 |
-| **Middleware** | `middleware/` | Gin 中间件 |
-| **Constant** | `constant/` | 常量定义 |
-| **Utility** | `utility/` | 工具函数 |
-
-## 两大子系统
-
-### OAuth2 子系统
-
-基于 `golang.org/x/oauth2` 扩展，提供：
-
-- **授权码流程** - State + PKCE 防护
-- **Token 管理** - Redis 缓存、自动刷新
-- **业务能力** - Userinfo、Introspection（带缓存）
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant App
-    participant SDK as Beacon SSO SDK
-    participant SSO as SSO Server
-    participant Redis
-
-    User->>App: 访问受保护资源
-    App->>SDK: OAuthRouter.OAuthRouter()
-    SDK->>SDK: Create() 生成 State + PKCE
-    SDK->>Redis: 缓存 State + Verifier
-    SDK->>User: 302 重定向到 SSO
-    User->>SSO: 授权
-    SSO->>User: 重定向回 callback?code=xxx&state=xxx
-    User->>SDK: GET /oauth/callback
-    SDK->>Redis: 验证 State，获取 Verifier
-    SDK->>SSO: Exchange(code, verifier)
-    SSO-->>SDK: Access Token + Refresh Token
-    SDK->>Redis: 缓存 Token
-    SDK-->>User: 登录成功
-```
-
-### gRPC 子系统
-
-基于 `connectrpc.com/connect` 实现，提供：
-
-| 服务 | 说明 | 认证要求 |
-|------|------|----------|
-| **Public** | 公共服务（发送验证码） | 无 |
-| **Auth** | 认证服务（注册/登录/改密） | App 凭证 |
-| **User** | 用户服务（获取用户信息） | App 凭证 + User Token |
-| **Merchant** | 商户服务（标签/公告） | App 凭证 |
-
-## 与 bamboo-base-go 的集成
-
-SDK 依赖 bamboo-base-go 的以下能力：
-
-| 能力 | 用途 |
-|------|------|
-| `xReg.Register` | 依赖注入容器 |
-| `xCtxUtil.MustGetDB` | 从上下文获取数据库 |
-| `xCtxUtil.MustGetRDB` | 从上下文获取 Redis |
-| `xError` | 统一错误处理 |
-| `xLog` | 结构化日志 |
-| `xResult` | 统一响应格式 |
+| 某些接口匿名可访问 | 不加中间件 | 请求直接进入 Handler |
+| 某些接口要求登录 | `group.Use(CheckAuth(ctx))` | 自动校验 `Authorization` |
+| 在业务代码里取当前 token | `c.Get("authorization")` | 拿到已验证 Access Token |
 
 <Callout type="info">
-确保你的项目已正确配置 bamboo-base-go 框架。
+如果你还没接入，先看 [快速开始](./quick-start) 再回来按场景细化。
 </Callout>

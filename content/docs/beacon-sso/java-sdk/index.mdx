@@ -1,27 +1,29 @@
 ---
 title: Java SDK
-description: Beacon SSO SDK Java 版本文档
+description: Beacon SSO Java SDK 接入与使用指南
 icon: Coffee
 ---
 
 # Java SDK
 
-基于 Spring Boot 3 的轻量级 OAuth2/SSO SDK，提供统一登录、用户管理和商户服务能力。
+本页只回答“接入后怎么用”。
 
-## 核心特性
+## 你会用到的能力
 
-- **OAuth2 授权码流程** - 完整的 State + PKCE (S256) 防护机制
-- **Spring Boot 自动配置** - 引入 Starter 即可，零配置启动
-- **双传输架构** - HTTP（默认）+ 可选 gRPC 服务
-- **Filter + AOP 认证** - `BeaconSsoFilter` 过滤器 + `@InjectData` / `@PermissionVerify` 注解
-- **Caffeine 缓存** - 基于 Caffeine 的高性能内存缓存
+| 需求 | 对应能力 | 文档 |
+|------|------|------|
+| 5 分钟跑通接入 | Starter 依赖 + `application.yml` | [快速开始](./quick-start) |
+| 配置端点/路径/gRPC | `beacon.sso.*` | [配置参考](./configuration) |
+| 统一鉴权入口 | `BeaconSsoFilter` | [认证过滤器](./filter/auth-filter) |
+| Controller 里直接拿用户信息 | `@InjectData` | [@InjectData](./aop/inject-data) |
+| Controller 做权限校验 | `@PermissionVerify` | [@PermissionVerify](./aop/permission-verify) |
 
-## 子系统概览
+## 接入路径概览
 
-| 子系统 | 说明 | 协议 |
-|--------|------|------|
-| [OAuth2](./oauth2) | 登录/回调/登出流程 | HTTP REST + Caffeine |
-| [gRPC](./grpc) | 用户/认证/商户服务 | gRPC（可选） |
+1. 引入 `bamboo-sso-sdk-springboot`
+2. 配置 `beacon.sso.*`
+3. 启动应用，自动注册 Filter、Controller、AOP
+4. 在业务 Controller 使用 `@InjectData` 和 `@PermissionVerify`
 
 ## 版本信息
 
@@ -33,5 +35,5 @@ icon: Coffee
 ## 快速开始
 
 <Callout type="info">
-5 分钟快速集成，请参考 [快速开始](./quick-start)。
+先走 [快速开始](./quick-start)，再按需求阅读 Filter / AOP / gRPC 子文档。
 </Callout>

@@ -1,86 +1,82 @@
 ---
 title: "@PermissionVerify"
-description: 基于 scope 的权限验证注解
+description: 基于 token scope 的权限验证注解
 icon: ShieldCheck
 ---
 
 # @PermissionVerify
 
-`@PermissionVerify` 注解用于在 Controller 方法执行前验证当前用户是否拥有所需的权限（scope）。
+`@PermissionVerify` 用于在 Controller 方法执行前校验当前用户权限。
+它校验的是 OAuth2 token 自省结果中的 `scope` 字段。
 
-## 功能说明
+## 对应关系（你最关心的）
 
-通过 `@PermissionVerify` 注解声明方法所需的权限，SDK 会在方法执行前自动检查当前用户的 Token scope 是否满足要求。若权限不足，直接返回 403 JSON 响应并抛出 `PermissionDeniedException`，方法不会被执行。
+| 你写的注解 | 实际校验对象 | 规则 |
+|------|------|------|
+| `@PermissionVerify(value = {"user:read"})` | Token 的 `scope` | 必须包含 `user:read` |
+| `@PermissionVerify(value = {"a", "b"}, requireAll = true)` | Token 的 `scope` | `a` 和 `b` 都要有 |
+| `@PermissionVerify(value = {"a", "b"}, requireAll = false)` | Token 的 `scope` | 有任意一个即可 |
+
+`scope` 由空格分隔，示例: `profile:read profile:write admin`。
+
+## 前置条件
+
+- 请求需要先经过 `BeaconSsoFilter`
+- Filter 会把 `IntrospectResult` 放到请求属性 `beacon.sso.introspection`
+- AOP 切面再读取该属性完成权限判断
+
+如果请求未携带有效 token，会先返回 `401`；不是 `@PermissionVerify` 返回 `403`。
 
 ## 注解参数
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `value` | `String[]` | - | 所需的权限（scope）字符串 |
-| `requireAll` | `boolean` | `true` | 是否需要满足所有权限（true = AND，false = OR） |
-| `message` | `String` | `"权限不足"` | 权限不足时的错误提示信息 |
+| `value` | `String[]` | `{}` | 所需权限列表（scope） |
+| `requireAll` | `boolean` | `true` | `true`=AND, `false`=OR |
+| `message` | `String` | `"权限不足"` | 校验失败提示 |
 
-## 使用方式
-
-### 方法级别
-
-在 Controller 方法上使用：
+## 使用示例
 
 ```java
 @RestController
-@RequestMapping("/api/admin")
-@PermissionVerify(value = "admin", message = "需要管理员权限")
-public class AdminController {
+@RequestMapping("/api/orders")
+@PermissionVerify(value = {"order:read"}) // 类级：默认需要 order:read
+public class OrderController {
 
-    // 继承类级别的 admin 权限要求
-    @GetMapping("/dashboard")
-    public BaseResponse<String> dashboard() {
-        return BaseResponse.success("ok", "管理面板");
+    @GetMapping("/{id}")
+    public BaseResponse<String> detail(
+            @PathVariable String id,
+            @InjectData("sub") String userId) {
+        return BaseResponse.success("ok", "user=" + userId + ", id=" + id);
     }
 
-    // 方法级别覆盖：需要 admin 或 settings 任一权限
-    @GetMapping("/settings")
-    @PermissionVerify(value = {"admin", "settings"}, requireAll = false)
-    public BaseResponse<String> settings() {
-        return BaseResponse.success("ok", "设置");
-    }
-}
-```
-
-### 多权限组合
-
-```java
-@RestController
-@RequestMapping("/api")
-public class DemoController {
-
-    // AND 模式：必须同时拥有 user:read 和 user:write
-    @GetMapping("/user/edit")
-    @PermissionVerify(value = {"user:read", "user:write"})
-    public BaseResponse<String> editUser() {
-        return BaseResponse.success("ok", "编辑用户");
+    // 方法级会覆盖类级：改为写权限
+    @PostMapping
+    @PermissionVerify(value = {"order:write"}, message = "缺少订单写权限")
+    public BaseResponse<String> create() {
+        return BaseResponse.success("ok", "created");
     }
 
-    // OR 模式：拥有 admin 或 super_admin 任一即可
-    @GetMapping("/manage")
-    @PermissionVerify(value = {"admin", "super_admin"}, requireAll = false)
-    public BaseResponse<String> manage() {
-        return BaseResponse.success("ok", "管理");
+    // OR 模式：只要有任意一个权限即可
+    @DeleteMapping("/{id}")
+    @PermissionVerify(value = {"order:delete", "admin"}, requireAll = false)
+    public BaseResponse<String> remove(@PathVariable String id) {
+        return BaseResponse.success("ok", "deleted:" + id);
     }
 }
 ```
 
 ## 类级别与方法级别
 
-方法级别的 `@PermissionVerify` 会**覆盖**类级别的注解。也就是说，如果类和方法上都声明了该注解，只有方法级别的注解会生效。
+方法级别 `@PermissionVerify` 会覆盖类级别定义。
 
 <Callout type="info">
-推荐将通用的权限要求声明在类级别上，特殊的权限要求在方法级别覆盖。
+建议把通用权限放类级，把差异权限放方法级覆盖。
 </Callout>
 
-## 权限不足响应
+## 失败响应
 
-当权限验证不通过时，SDK 会向客户端写入 403 JSON 响应：
+权限不足时，SDK 返回 `403`：
 
 ```json
 {
@@ -90,4 +86,12 @@ public class DemoController {
 }
 ```
 
-如果指定了自定义 `message`，响应中的 `message` 字段会使用你设置的值。
+如果设置了 `message`，响应会返回你自定义的提示文本。
+
+## 常见问题
+
+| 问题 | 说明 |
+|------|------|
+| `value` 留空会怎样 | 不做权限校验，直接放行 |
+| 为什么明明有注解却没生效 | 请求可能未经过 `BeaconSsoFilter`，或 `exclude-urls` 配置把它排除了 |
+| 为什么返回 401 而不是 403 | 先发生了认证失败（缺 token / token 无效），还没到权限校验阶段 |
